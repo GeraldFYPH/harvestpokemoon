@@ -90,6 +90,7 @@ function harvestPlot(tx, ty) {
   berryBag[plot.berryId] = (berryBag[plot.berryId] || 0) + amt;
   // Harvest tracking for spawn conditions
   if (plot.berryId === 'oran') spawnTrackers.bulbasaur.oranHarvestCount += amt;
+  if (plot.berryId === 'rawst') spawnTrackers.charmander.rawstHarvestCount += amt;
   farmPlots[key] = { berryId: null, stage: STAGE_EMPTY, stageStartAt: Date.now() };
   updateFarmHUD();
   saveGame();
@@ -321,7 +322,8 @@ function drawBattleSprites() {
   const ec = document.getElementById('enemy-sprite');
   const ectx = ec.getContext('2d');
   ectx.clearRect(0, 0, ec.width, ec.height);
-  drawPixelArt(ectx, SPRITES.bulbasaur, 8, 6, 6);
+  const enemySprite = (wildPokemon.species === 'charmander') ? SPRITES.wildPoke : SPRITES.bulbasaur;
+  drawPixelArt(ectx, enemySprite, 8, 6, 6);
   const pc = document.getElementById('player-back-sprite');
   const pctx = pc.getContext('2d');
   pctx.clearRect(0, 0, pc.width, pc.height);
@@ -402,6 +404,7 @@ const wildPokemon = {
 // Add new entries here when new Pokémon conditions are designed.
 const spawnTrackers = {
   bulbasaur: { oranHarvestCount: 0 },
+  charmander: { rawstHarvestCount: 0 },
 };
 
 const SPAWN_CONDITIONS = [
@@ -411,6 +414,13 @@ const SPAWN_CONDITIONS = [
     check: () => spawnTrackers.bulbasaur.oranHarvestCount >= 5,
     onReset: () => { spawnTrackers.bulbasaur.oranHarvestCount = 0; },
     spawnChance: 0.55,   // 55% chance once threshold met
+  },
+  {
+    species: 'charmander',
+    // CONDITION: harvest ≥5 Rawst Berries since last encounter
+    check: () => spawnTrackers.charmander.rawstHarvestCount >= 5,
+    onReset: () => { spawnTrackers.charmander.rawstHarvestCount = 0; },
+    spawnChance: 0.55,
   },
   // Future Pokémon conditions go here
 ];
@@ -525,7 +535,7 @@ function drawWildPokemon(camX, camY) {
   ctx.fill();
 
   // Animated sprite
-  if (bulbasaurReady) {
+  if (wp.species === 'bulbasaur' && bulbasaurReady) {
     const row = DIR_ROW[wp.dir] ?? 0;
     // Same time-based walk animation as the player: strictly walk1 ↔ walk2.
     const moving = (wp.state === 'entering' || wp.state === 'seeking' || wp.state === 'fleeing');
@@ -988,8 +998,11 @@ function startBattle() {
     document.getElementById('overworld').style.display = 'none';
     document.getElementById('battle-screen').style.display = 'flex';
     document.getElementById('farm-hud').style.display = 'none';
+    const wildName = wildPokemon.species ? wildPokemon.species.toUpperCase() : 'POKÉMON';
+    document.getElementById('enemy-name').textContent = wildName;
+    drawBattleSprites();
     updateHPBars();
-    showBattleMsg('A wild BULBASAUR appeared!', () => {
+    showBattleMsg(`A wild ${wildName} appeared!`, () => {
       showBattleMsg('Go! CHARMANDER!', () => showBattleMsg('What will CHARMANDER do?', showActions));
     });
   }, 700);

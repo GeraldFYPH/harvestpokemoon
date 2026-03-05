@@ -38,6 +38,7 @@ This document serves as the primary onboarding source for AI assistants and deve
 | Pokémon   | Condition                                    | Spawn Chance | Resets On         |
 |-----------|----------------------------------------------|--------------|-------------------|
 | Bulbasaur | Player harvests ≥5 Oran Berries since reset  | 55%          | Battle or capture |
+| Charmander| Player harvests ≥5 Rawst Berries since reset | 55%          | Battle or capture |
 
 ## 📜 Change Log
 *Tracking of all system changes starts here.*
@@ -60,3 +61,8 @@ This document serves as the primary onboarding source for AI assistants and deve
 - A progress bar displays below the Pokémon while eating; crop is destroyed on completion.
 - Pokémon flees off the right edge after eating; player can press A nearby to trigger battle.
 - Harvest counters and spawn conditions defined in extensible `SPAWN_CONDITIONS` registry.
+
+### [2026-03-05] - Added Charmander
+- Added Charmander as a wild Pokémon spawn option.
+- Charmander spawns with 55% chance after the player harvests ≥5 Rawst Berries.
+- Updated encounter text and battle sprites to dynamically reflect either Bulbasaur or Charmander.
