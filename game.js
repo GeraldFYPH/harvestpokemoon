@@ -316,13 +316,21 @@ const SPRITES = {
     p.push([10, 13, '#f08030'], [11, 13, '#f08030'], [10, 14, '#c05020'], [11, 14, '#c05020']);
     return p;
   })(),
+  charmanderFront: (() => {
+    const p = [];
+    for (let x = 2; x <= 5; x++) for (let y = 0; y <= 1; y++) p.push([x, y, '#d05030']);
+    for (let x = 1; x <= 6; x++) for (let y = 2; y <= 5; y++) p.push([x, y, '#f08030']);
+    for (let x = 2; x <= 5; x++) for (let y = 6; y <= 7; y++) p.push([x, y, '#f08030']);
+    p.push([2, 3, '#202020'], [5, 3, '#202020'], [3, 5, '#f5c870'], [4, 5, '#f5c870']);
+    return p;
+  })(),
 };
 
 function drawBattleSprites() {
   const ec = document.getElementById('enemy-sprite');
   const ectx = ec.getContext('2d');
   ectx.clearRect(0, 0, ec.width, ec.height);
-  const enemySprite = (wildPokemon.species === 'charmander') ? SPRITES.wildPoke : SPRITES.bulbasaur;
+  const enemySprite = (wildPokemon.species === 'charmander') ? SPRITES.charmanderFront : SPRITES.bulbasaur;
   drawPixelArt(ectx, enemySprite, 8, 6, 6);
   const pc = document.getElementById('player-back-sprite');
   const pctx = pc.getContext('2d');
@@ -433,6 +441,7 @@ function getReadyCrops() {
 
 function spawnWildPokemon(species) {
   const crops = getReadyCrops();
+  console.log(`[Spawn] Attempting to spawn ${species}. Ready crops: ${crops.length}`);
   if (crops.length === 0) return; // No crops to eat — bail
 
   const [cropKey] = crops[Math.floor(Math.random() * crops.length)];
@@ -551,6 +560,9 @@ function drawWildPokemon(camX, camY) {
       col * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H,
       sx - offsetX, sy - Math.round(TILE * scaleY), drawW, drawH
     );
+  } else if (wp.species === 'charmander') {
+    const ps = Math.round(2.5 * Math.min(scaleX, scaleY));
+    drawPixelArt(ctx, SPRITES.charmanderFront, sx, sy + Math.round(scaleY), ps);
   } else {
     // Fallback: draw the procedural wildPoke sprite
     const ps = Math.round(2.5 * Math.min(scaleX, scaleY));
