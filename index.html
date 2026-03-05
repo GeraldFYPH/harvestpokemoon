@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Harvest Pokemoon</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="screen">
+
+    <!-- OVERWORLD CANVAS -->
+    <canvas id="overworld"></canvas>
+
+    <!-- BATTLE SCREEN -->
+    <div id="battle-screen">
+      <div id="battle-scene">
+        <div class="battle-platform" id="enemy-platform"></div>
+        <div class="battle-platform" id="player-platform"></div>
+        <div id="enemy-hud">
+          <div class="poke-name">
+            <span id="enemy-name">BULBASAUR</span>
+            <span id="enemy-level">Lv5</span>
+          </div>
+          <div class="hp-label">HP</div>
+          <div class="hp-bar-bg"><div class="hp-bar hp-high" id="enemy-hp-bar" style="width:100%"></div></div>
+        </div>
+        <div id="player-hud">
+          <div class="poke-name">
+            <span id="player-poke-name">CHARMANDER</span>
+            <span id="player-level">Lv5</span>
+          </div>
+          <div class="hp-label">HP</div>
+          <div class="hp-bar-bg"><div class="hp-bar hp-high" id="player-hp-bar" style="width:100%"></div></div>
+          <div class="hp-text"><span id="player-hp-text">20/20</span></div>
+        </div>
+        <div id="enemy-sprite-wrap"><canvas id="enemy-sprite" width="96" height="96"></canvas></div>
+        <div id="player-sprite-wrap"><canvas id="player-back-sprite" width="88" height="88"></canvas></div>
+      </div>
+      <div id="battle-ui">
+        <div id="battle-msg">What will CHARMANDER do?</div>
+        <div id="battle-actions">
+          <button class="battle-btn" id="fight-btn">FIGHT</button>
+          <button class="battle-btn" id="bag-btn" disabled>BAG</button>
+          <button class="battle-btn" id="run-btn">RUN</button>
+          <button class="battle-btn" id="pkmn-btn" disabled>PKMN</button>
+        </div>
+        <div id="moves-menu">
+          <button class="move-btn" id="move1-btn">EMBER</button>
+          <button class="move-btn" id="move2-btn">SCRATCH</button>
+          <button class="move-btn" id="move3-btn">GROWL</button>
+          <button class="move-btn" id="move4-btn">TAIL WHIP</button>
+          <button id="back-btn">BACK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BERRY PLANTING MENU -->
+    <div id="berry-menu">
+      <div id="berry-menu-title">Choose a Berry to Plant</div>
+      <div id="berry-list"></div>
+      <button id="berry-cancel-btn">CANCEL</button>
+    </div>
+
+    <!-- FARM HUD (top-left, shows inventory) -->
+    <div id="farm-hud">
+      <div id="farm-hud-title">BERRY BAG</div>
+      <div id="farm-hud-list"></div>
+    </div>
+
+    <!-- Battle transition flash -->
+    <div id="battle-transition"></div>
+
+    <!-- A / B overlay buttons -->
+    <div id="action-buttons">
+      <button class="action-btn" id="btn-b">B</button>
+      <button class="action-btn" id="btn-a">A</button>
+    </div>
+
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

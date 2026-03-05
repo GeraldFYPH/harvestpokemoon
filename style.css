@@ -1,0 +1,424 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* ── RESET & BASE ── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  image-rendering: pixelated;
+}
+
+:root {
+  --gb-green:      #9bbc0f;
+  --gb-dark-green: #306230;
+  --gb-black:      #0f380f;
+  --gb-mid:        #8bac0f;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  font-family: 'Press Start 2P', monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── FIXED GAME CONTAINER — never stretches, always centered ── */
+#screen {
+  width:  960px;
+  height: 720px;
+  position: relative;
+  overflow: hidden;
+  background: var(--gb-green);
+  flex-shrink: 0;
+  transform-origin: center center;
+  box-shadow: 0 0 0 4px #333, 0 0 40px rgba(0,0,0,0.8);
+}
+
+/* ── OVERWORLD CANVAS — fills the fixed container exactly ── */
+#overworld {
+  position: absolute;
+  inset: 0;
+  width:  100%;
+  height: 100%;
+  display: block;
+}
+
+/* ── BATTLE SCREEN ── */
+#battle-screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  background: var(--gb-green);
+  overflow: hidden;
+}
+
+/* Battle scene (top 60%) */
+#battle-scene {
+  flex: 1;
+  position: relative;
+  background: linear-gradient(
+    180deg,
+    var(--gb-mid)      0%,
+    var(--gb-mid)      52%,
+    var(--gb-dark-green) 52%,
+    var(--gb-dark-green) 66%,
+    var(--gb-green)    66%
+  );
+  overflow: hidden;
+}
+
+.battle-platform {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+#enemy-platform  { width: 180px; height: 28px; top: 51%; right: 12%; }
+#player-platform { width: 150px; height: 24px; bottom: 8%; left: 8%; }
+
+/* ── BATTLE HUDs ── */
+#enemy-hud {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  background: var(--gb-black);
+  border: 3px solid var(--gb-black);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-width: 200px;
+}
+
+#player-hud {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  background: var(--gb-black);
+  border: 3px solid var(--gb-black);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-width: 200px;
+}
+
+.poke-name {
+  font-size: 9px;
+  color: var(--gb-green);
+  margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.hp-label {
+  font-size: 7px;
+  color: var(--gb-mid);
+  margin-bottom: 3px;
+}
+
+.hp-text {
+  font-size: 7px;
+  color: var(--gb-green);
+  margin-top: 4px;
+}
+
+.hp-bar-bg {
+  background: var(--gb-dark-green);
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.hp-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.hp-high { background: var(--gb-green); }
+.hp-mid  { background: #e6c000; }
+.hp-low  { background: #c03030; }
+
+/* ── BATTLE SPRITES ── */
+#enemy-sprite-wrap {
+  position: absolute;
+  top: 4%;
+  right: 14%;
+}
+
+#player-sprite-wrap {
+  position: absolute;
+  bottom: 12%;
+  left: 6%;
+}
+
+#enemy-sprite        { width: 128px; height: 128px; }
+#player-back-sprite  { width: 112px; height: 112px; }
+
+/* ── BATTLE UI (bottom panel) ── */
+#battle-ui {
+  height: clamp(110px, 22vh, 160px);
+  background: var(--gb-green);
+  border-top: 4px solid var(--gb-dark-green);
+  display: flex;
+  flex-direction: column;
+}
+
+#battle-msg {
+  flex: 1;
+  padding: 10px 14px 6px;
+  font-size: clamp(8px, 1.6vw, 11px);
+  color: var(--gb-black);
+  line-height: 1.8;
+  display: flex;
+  align-items: center;
+  white-space: pre-line;
+}
+
+/* Action buttons grid */
+#battle-actions {
+  display: none;
+  padding: 4px 10px 10px;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.battle-btn {
+  flex: 1 1 calc(50% - 6px);
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(7px, 1.3vw, 9px);
+  padding: 8px 6px;
+  background: var(--gb-black);
+  color: var(--gb-green);
+  border: 2px solid var(--gb-dark-green);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, transform 0.05s;
+  text-align: center;
+  min-width: 80px;
+}
+
+.battle-btn:hover  { background: var(--gb-dark-green); color: #c8ff00; }
+.battle-btn:active { transform: scale(0.96); }
+.battle-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+
+/* Moves menu */
+#moves-menu {
+  display: none;
+  padding: 4px 10px 10px;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.move-btn {
+  flex: 1 1 calc(50% - 6px);
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(7px, 1.2vw, 9px);
+  padding: 8px 6px;
+  background: var(--gb-dark-green);
+  color: var(--gb-green);
+  border: 2px solid var(--gb-black);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  text-align: center;
+}
+
+.move-btn:hover  { background: var(--gb-black); color: #c8ff00; }
+.move-btn:active { transform: scale(0.96); }
+.move-btn:disabled { opacity: 0.35; cursor: default; }
+
+#back-btn {
+  width: 100%;
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(7px, 1.2vw, 9px);
+  padding: 6px;
+  background: var(--gb-mid);
+  color: var(--gb-black);
+  border: 2px solid var(--gb-dark-green);
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.1s;
+}
+
+#back-btn:hover { background: var(--gb-green); }
+
+/* ── A / B OVERLAY BUTTONS ── */
+#action-buttons {
+  position: absolute;
+  bottom: 28px;
+  right: 28px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  z-index: 100;
+  pointer-events: none; /* container transparent to clicks */
+}
+
+.action-btn {
+  pointer-events: all;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  opacity: 0.55;
+  backdrop-filter: blur(2px);
+  transition: opacity 0.15s, transform 0.08s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.action-btn:hover  { opacity: 0.8; }
+.action-btn:active { transform: scale(0.92); opacity: 0.95; }
+
+#btn-a {
+  background: radial-gradient(circle at 38% 38%, rgba(200, 50, 50, 0.75), rgba(120, 20, 20, 0.75));
+}
+
+#btn-b {
+  background: radial-gradient(circle at 38% 38%, rgba(50, 80, 200, 0.75), rgba(20, 40, 120, 0.75));
+  width: 44px;
+  height: 44px;
+  font-size: 11px;
+}
+
+/* ── BATTLE TRANSITION FLASH ── */
+#battle-transition {
+  position: absolute;
+  inset: 0;
+  background: var(--gb-black);
+  z-index: 50;
+  display: none;
+  animation: flashIn 0.65s steps(1) forwards;
+}
+
+@keyframes flashIn {
+  0%, 20%, 40%, 60% { opacity: 1; }
+  10%, 30%, 50%     { opacity: 0; }
+  70%, 100%         { opacity: 1; }
+}
+
+/* ── COMBAT ANIMATIONS ── */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-8px); }
+  40%      { transform: translateX(8px); }
+  60%      { transform: translateX(-5px); }
+  80%      { transform: translateX(5px); }
+}
+
+@keyframes fadeFlash {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.1; }
+}
+
+.shake     { animation: shake 0.35s ease; }
+.hit-flash { animation: fadeFlash 0.15s ease 3; }
+
+/* ══════════════════════════════════════════════
+   FARM UI
+══════════════════════════════════════════════ */
+
+/* Berry planting menu */
+#berry-menu {
+  display: none;
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: var(--gb-black);
+  border-top: 4px solid var(--gb-dark-green);
+  padding: 14px 18px 18px;
+  z-index: 60;
+  flex-direction: column;
+  gap: 10px;
+}
+#berry-menu.active { display: flex; }
+
+#berry-menu-title {
+  font-size: 9px;
+  color: var(--gb-green);
+  margin-bottom: 4px;
+  letter-spacing: 1px;
+}
+
+#berry-list {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.berry-choice-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  padding: 8px 4px;
+  background: var(--gb-dark-green);
+  color: var(--gb-green);
+  border: 2px solid var(--gb-mid);
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: center;
+  line-height: 1.6;
+  transition: background 0.1s, color 0.1s;
+}
+.berry-choice-btn:hover, .berry-choice-btn.selected { background: var(--gb-mid); color: var(--gb-black); border-color: #fff; }
+.berry-choice-btn.selected { animation: selectPulse 0.4s infinite alternate; }
+@keyframes selectPulse {
+  from { box-shadow: 0 0 2px #fff; }
+  to   { box-shadow: 0 0 8px #fff; }
+}
+.berry-choice-btn:disabled { opacity: 0.3; cursor: default; }
+.berry-choice-btn .berry-count { display: block; color: var(--gb-mid); font-size: 5px; margin-top: 3px; }
+
+#berry-cancel-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  padding: 7px 14px;
+  background: var(--gb-dark-green);
+  color: var(--gb-green);
+  border: 2px solid var(--gb-mid);
+  border-radius: 3px;
+  cursor: pointer;
+  align-self: flex-end;
+  transition: background 0.1s;
+}
+#berry-cancel-btn:hover { background: var(--gb-mid); color: var(--gb-black); }
+
+/* Farm HUD — berry bag inventory */
+#farm-hud {
+  position: absolute;
+  top: 14px; left: 14px;
+  background: rgba(15, 56, 15, 0.88);
+  border: 3px solid var(--gb-dark-green);
+  border-radius: 5px;
+  padding: 8px 12px;
+  min-width: 130px;
+  z-index: 40;
+  pointer-events: none;
+}
+#farm-hud-title {
+  font-size: 7px;
+  color: var(--gb-mid);
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+#farm-hud-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.farm-hud-row {
+  font-size: 6px;
+  color: var(--gb-green);
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.farm-hud-row span { color: var(--gb-mid); }
