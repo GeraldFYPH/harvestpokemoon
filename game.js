@@ -987,6 +987,7 @@ function startBattle() {
     trans.style.display = 'none';
     document.getElementById('overworld').style.display = 'none';
     document.getElementById('battle-screen').style.display = 'flex';
+    document.getElementById('farm-hud').style.display = 'none';
     updateHPBars();
     showBattleMsg('A wild BULBASAUR appeared!', () => {
       showBattleMsg('Go! CHARMANDER!', () => showBattleMsg('What will CHARMANDER do?', showActions));
@@ -1005,6 +1006,7 @@ function endBattle(won) {
     setTimeout(() => {
       document.getElementById('battle-screen').style.display = 'none';
       document.getElementById('overworld').style.display = 'block';
+      document.getElementById('farm-hud').style.display = 'block';
       gameState = 'overworld';
       wildPokemon.active = false;
       wildPokemon.state = 'idle';
@@ -1071,6 +1073,7 @@ document.getElementById('run-btn').addEventListener('click', () => {
     setTimeout(() => {
       document.getElementById('battle-screen').style.display = 'none';
       document.getElementById('overworld').style.display = 'block';
+      document.getElementById('farm-hud').style.display = 'block';
       gameState = 'overworld'; battle.busy = false;
     }, 800);
   });
