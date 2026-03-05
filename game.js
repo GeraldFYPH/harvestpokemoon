@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════
 //  SPRITE SHEET CONFIG
-//  Sheet: p1sprites.png  — 3 cols × 4 rows, 128×128 px per frame
+//  Sheet: player1sprites.png  — 3 cols × 4 rows, 128×128 px per frame
 //  Row 0=Down  Row 1=Up  Row 2=Left  Row 3=Right
 //  Col 0=Idle  Col 1=Walk1  Col 2=Walk2
 //
@@ -17,10 +17,10 @@ const WALK_SPEED = 2;
 const RUN_SPEED = 4;
 
 const playerSheet = new Image();
-playerSheet.src = 'character assets/p1sprites.png';
+playerSheet.src = 'character assets/player1sprites.png';
 let sheetReady = false;
 playerSheet.onload = () => { sheetReady = true; };
-playerSheet.onerror = () => { console.warn('p1sprites.png not found — using fallback.'); };
+playerSheet.onerror = () => { console.warn('player1sprites.png not found — using fallback.'); };
 
 const bulbasaurSheet = new Image();
 bulbasaurSheet.src = 'pokemon assets/overworld/bulbasaur.png';
