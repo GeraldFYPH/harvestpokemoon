@@ -9,13 +9,14 @@
 }
 
 :root {
-  --gb-green:      #9bbc0f;
+  --gb-green: #9bbc0f;
   --gb-dark-green: #306230;
-  --gb-black:      #0f380f;
-  --gb-mid:        #8bac0f;
+  --gb-black: #0f380f;
+  --gb-mid: #8bac0f;
 }
 
-html, body {
+html,
+body {
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -28,21 +29,21 @@ html, body {
 
 /* ── FIXED GAME CONTAINER — never stretches, always centered ── */
 #screen {
-  width:  960px;
+  width: 960px;
   height: 720px;
   position: relative;
   overflow: hidden;
   background: var(--gb-green);
   flex-shrink: 0;
   transform-origin: center center;
-  box-shadow: 0 0 0 4px #333, 0 0 40px rgba(0,0,0,0.8);
+  box-shadow: 0 0 0 4px #333, 0 0 40px rgba(0, 0, 0, 0.8);
 }
 
 /* ── OVERWORLD CANVAS — fills the fixed container exactly ── */
 #overworld {
   position: absolute;
   inset: 0;
-  width:  100%;
+  width: 100%;
   height: 100%;
   display: block;
 }
@@ -61,14 +62,12 @@ html, body {
 #battle-scene {
   flex: 1;
   position: relative;
-  background: linear-gradient(
-    180deg,
-    var(--gb-mid)      0%,
-    var(--gb-mid)      52%,
-    var(--gb-dark-green) 52%,
-    var(--gb-dark-green) 66%,
-    var(--gb-green)    66%
-  );
+  background: linear-gradient(180deg,
+      var(--gb-mid) 0%,
+      var(--gb-mid) 52%,
+      var(--gb-dark-green) 52%,
+      var(--gb-dark-green) 66%,
+      var(--gb-green) 66%);
   overflow: hidden;
 }
 
@@ -78,8 +77,19 @@ html, body {
   background: rgba(0, 0, 0, 0.15);
 }
 
-#enemy-platform  { width: 180px; height: 28px; top: 51%; right: 12%; }
-#player-platform { width: 150px; height: 24px; bottom: 8%; left: 8%; }
+#enemy-platform {
+  width: 200px;
+  height: 32px;
+  top: 48%;
+  right: 12%;
+}
+
+#player-platform {
+  width: 240px;
+  height: 40px;
+  bottom: 8%;
+  left: 4%;
+}
 
 /* ── BATTLE HUDs ── */
 #enemy-hud {
@@ -138,25 +148,77 @@ html, body {
   transition: width 0.4s ease;
 }
 
-.hp-high { background: var(--gb-green); }
-.hp-mid  { background: #e6c000; }
-.hp-low  { background: #c03030; }
+.hp-high {
+  background: var(--gb-green);
+}
+
+.hp-mid {
+  background: #e6c000;
+}
+
+.hp-low {
+  background: #c03030;
+}
 
 /* ── BATTLE SPRITES ── */
 #enemy-sprite-wrap {
   position: absolute;
-  top: 4%;
-  right: 14%;
+  top: 10%;
+  right: 18%;
 }
 
 #player-sprite-wrap {
   position: absolute;
   bottom: 12%;
-  left: 6%;
+  left: 10%;
 }
 
-#enemy-sprite        { width: 128px; height: 128px; }
-#player-back-sprite  { width: 112px; height: 112px; }
+#enemy-sprite {
+  width: 160px;
+  height: 160px;
+}
+
+#player-back-sprite {
+  width: 180px;
+  height: 180px;
+}
+
+.status-tag {
+  font-size: 8px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  color: #fff;
+  text-transform: uppercase;
+  margin: 0 4px;
+  display: none;
+}
+
+.status-brn {
+  background: #f08030;
+  display: inline-block;
+}
+
+.status-par {
+  background: #f8d030;
+  display: inline-block;
+  color: #000;
+}
+
+.status-slp {
+  background: #a8a878;
+  display: inline-block;
+}
+
+.status-frz {
+  background: #98d8d8;
+  display: inline-block;
+  color: #000;
+}
+
+.status-psn {
+  background: #a040a0;
+  display: inline-block;
+}
 
 /* ── BATTLE UI (bottom panel) ── */
 #battle-ui {
@@ -201,9 +263,20 @@ html, body {
   min-width: 80px;
 }
 
-.battle-btn:hover  { background: var(--gb-dark-green); color: #c8ff00; }
-.battle-btn:active { transform: scale(0.96); }
-.battle-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+.battle-btn:hover {
+  background: var(--gb-dark-green);
+  color: #c8ff00;
+}
+
+.battle-btn:active {
+  transform: scale(0.96);
+}
+
+.battle-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  transform: none;
+}
 
 /* Moves menu */
 #moves-menu {
@@ -227,9 +300,19 @@ html, body {
   text-align: center;
 }
 
-.move-btn:hover  { background: var(--gb-black); color: #c8ff00; }
-.move-btn:active { transform: scale(0.96); }
-.move-btn:disabled { opacity: 0.35; cursor: default; }
+.move-btn:hover {
+  background: var(--gb-black);
+  color: #c8ff00;
+}
+
+.move-btn:active {
+  transform: scale(0.96);
+}
+
+.move-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 
 #back-btn {
   width: 100%;
@@ -245,7 +328,9 @@ html, body {
   transition: background 0.1s;
 }
 
-#back-btn:hover { background: var(--gb-green); }
+#back-btn:hover {
+  background: var(--gb-green);
+}
 
 /* ── A / B OVERLAY BUTTONS ── */
 #action-buttons {
@@ -256,7 +341,8 @@ html, body {
   gap: 14px;
   align-items: center;
   z-index: 100;
-  pointer-events: none; /* container transparent to clicks */
+  pointer-events: none;
+  /* container transparent to clicks */
 }
 
 .action-btn {
@@ -277,8 +363,14 @@ html, body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
-.action-btn:hover  { opacity: 0.8; }
-.action-btn:active { transform: scale(0.92); opacity: 0.95; }
+.action-btn:hover {
+  opacity: 0.8;
+}
+
+.action-btn:active {
+  transform: scale(0.92);
+  opacity: 0.95;
+}
 
 #btn-a {
   background: radial-gradient(circle at 38% 38%, rgba(200, 50, 50, 0.75), rgba(120, 20, 20, 0.75));
@@ -302,27 +394,70 @@ html, body {
 }
 
 @keyframes flashIn {
-  0%, 20%, 40%, 60% { opacity: 1; }
-  10%, 30%, 50%     { opacity: 0; }
-  70%, 100%         { opacity: 1; }
+
+  0%,
+  20%,
+  40%,
+  60% {
+    opacity: 1;
+  }
+
+  10%,
+  30%,
+  50% {
+    opacity: 0;
+  }
+
+  70%,
+  100% {
+    opacity: 1;
+  }
 }
 
 /* ── COMBAT ANIMATIONS ── */
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%      { transform: translateX(-8px); }
-  40%      { transform: translateX(8px); }
-  60%      { transform: translateX(-5px); }
-  80%      { transform: translateX(5px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-8px);
+  }
+
+  40% {
+    transform: translateX(8px);
+  }
+
+  60% {
+    transform: translateX(-5px);
+  }
+
+  80% {
+    transform: translateX(5px);
+  }
 }
 
 @keyframes fadeFlash {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.1; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.1;
+  }
 }
 
-.shake     { animation: shake 0.35s ease; }
-.hit-flash { animation: fadeFlash 0.15s ease 3; }
+.shake {
+  animation: shake 0.35s ease;
+}
+
+.hit-flash {
+  animation: fadeFlash 0.15s ease 3;
+}
 
 /* ══════════════════════════════════════════════
    FARM UI
@@ -332,7 +467,9 @@ html, body {
 #berry-menu {
   display: none;
   position: absolute;
-  bottom: 0; left: 0; right: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   background: var(--gb-black);
   border-top: 4px solid var(--gb-dark-green);
   padding: 14px 18px 18px;
@@ -340,7 +477,10 @@ html, body {
   flex-direction: column;
   gap: 10px;
 }
-#berry-menu.active { display: flex; }
+
+#berry-menu.active {
+  display: flex;
+}
 
 #berry-menu-title {
   font-size: 9px;
@@ -368,14 +508,39 @@ html, body {
   line-height: 1.6;
   transition: background 0.1s, color 0.1s;
 }
-.berry-choice-btn:hover, .berry-choice-btn.selected { background: var(--gb-mid); color: var(--gb-black); border-color: #fff; }
-.berry-choice-btn.selected { animation: selectPulse 0.4s infinite alternate; }
-@keyframes selectPulse {
-  from { box-shadow: 0 0 2px #fff; }
-  to   { box-shadow: 0 0 8px #fff; }
+
+.berry-choice-btn:hover,
+.berry-choice-btn.selected {
+  background: var(--gb-mid);
+  color: var(--gb-black);
+  border-color: #fff;
 }
-.berry-choice-btn:disabled { opacity: 0.3; cursor: default; }
-.berry-choice-btn .berry-count { display: block; color: var(--gb-mid); font-size: 5px; margin-top: 3px; }
+
+.berry-choice-btn.selected {
+  animation: selectPulse 0.4s infinite alternate;
+}
+
+@keyframes selectPulse {
+  from {
+    box-shadow: 0 0 2px #fff;
+  }
+
+  to {
+    box-shadow: 0 0 8px #fff;
+  }
+}
+
+.berry-choice-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.berry-choice-btn .berry-count {
+  display: block;
+  color: var(--gb-mid);
+  font-size: 5px;
+  margin-top: 3px;
+}
 
 #berry-cancel-btn {
   font-family: 'Press Start 2P', monospace;
@@ -389,12 +554,17 @@ html, body {
   align-self: flex-end;
   transition: background 0.1s;
 }
-#berry-cancel-btn:hover { background: var(--gb-mid); color: var(--gb-black); }
+
+#berry-cancel-btn:hover {
+  background: var(--gb-mid);
+  color: var(--gb-black);
+}
 
 /* Farm HUD — berry bag inventory */
 #farm-hud {
   position: absolute;
-  top: 14px; left: 14px;
+  top: 14px;
+  left: 14px;
   background: rgba(15, 56, 15, 0.88);
   border: 3px solid var(--gb-dark-green);
   border-radius: 5px;
@@ -403,17 +573,20 @@ html, body {
   z-index: 40;
   pointer-events: none;
 }
+
 #farm-hud-title {
   font-size: 7px;
   color: var(--gb-mid);
   margin-bottom: 6px;
   letter-spacing: 1px;
 }
+
 #farm-hud-list {
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
+
 .farm-hud-row {
   font-size: 6px;
   color: var(--gb-green);
@@ -421,12 +594,17 @@ html, body {
   justify-content: space-between;
   gap: 10px;
 }
-.farm-hud-row span { color: var(--gb-mid); }
+
+.farm-hud-row span {
+  color: var(--gb-mid);
+}
 
 /* ── OVERWORLD MESSAGE OVERLAY ── */
 #message-overlay {
   position: absolute;
-  bottom: 0; left: 0; right: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: none;
   background: var(--gb-black);
   border-top: 4px solid var(--gb-dark-green);

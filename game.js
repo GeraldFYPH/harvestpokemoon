@@ -344,36 +344,64 @@ const SPRITES = {
 // ══════════════════════════════════════════════
 const pokemonDataCache = {};
 
-async function fetchPokemonData(species) {
+async function fetchPokemonData(species, level = 5) {
   if (pokemonDataCache[species]) return pokemonDataCache[species];
   try {
     const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${species.toLowerCase()}`);
     const data = await res.json();
-    const movesPromises = data.moves
+
+    // Process all level-up moves
+    const allMoves = data.moves
       .filter(m => m.version_group_details.some(v => v.move_learn_method.name === 'level-up'))
-      .slice(0, 4)
-      .map(async m => {
-        try {
-          const mRes = await fetch(m.move.url);
-          const mData = await mRes.json();
-          return {
-            name: m.move.name.toUpperCase().replace('-', ' '),
-            power: mData.power || 40,
-            pp: mData.pp || 35,
-            type: mData.type.name
-          };
-        } catch (e) {
-          return { name: m.move.name.toUpperCase().replace('-', ' '), power: 40, pp: 35, type: 'normal' };
-        }
+      .map(m => {
+        const detail = m.version_group_details.find(v => v.move_learn_method.name === 'level-up');
+        return {
+          name: m.move.name.toUpperCase().replace('-', ' '),
+          url: m.move.url,
+          level: detail.level_learned_at
+        };
       });
+
+    // Get current moves based on level (max 4, most recently learned)
+    const currentMovesMeta = allMoves
+      .filter(m => m.level <= level)
+      .sort((a, b) => b.level - a.level)
+      .slice(0, 4);
+
+    const movesPromises = currentMovesMeta.map(async m => {
+      try {
+        const mRes = await fetch(m.url);
+        const mData = await mRes.json();
+        return {
+          name: m.name,
+          power: mData.power,
+          pp: mData.pp,
+          type: mData.type.name,
+          category: mData.damage_class.name, // physical, special, status
+          accuracy: mData.accuracy,
+          effect_chance: mData.effect_chance,
+          effect_entries: mData.effect_entries
+        };
+      } catch (e) {
+        return { name: m.name, power: 40, pp: 35, type: 'normal', category: 'physical' };
+      }
+    });
+
     const moves = await Promise.all(movesPromises);
+
+    // Stats: [hp, atk, def, spAtk, spDef, speed]
+    const baseStats = {};
+    data.stats.forEach(s => { baseStats[s.stat.name] = s.base_stat; });
+
     const processedData = {
       name: data.name.toUpperCase(),
+      types: data.types.map(t => t.type.name),
+      baseStats,
       sprites: {
-        front: data.sprites.front_default,
-        back: data.sprites.back_default,
+        front: data.sprites.versions['generation-v']['black-white'].animated.front_default || data.sprites.front_default,
+        back: data.sprites.versions['generation-v']['black-white'].animated.back_default || data.sprites.back_default,
       },
-      moves: moves.length > 0 ? moves : [{ name: 'TACKLE', power: 40, pp: 35, type: 'normal' }]
+      moves: moves.length > 0 ? moves : [{ name: 'TACKLE', power: 40, pp: 35, type: 'normal', category: 'physical' }]
     };
     pokemonDataCache[species] = processedData;
     return processedData;
@@ -381,6 +409,40 @@ async function fetchPokemonData(species) {
     console.warn(`PokéAPI fetch failed for ${species}:`, err);
     return null;
   }
+}
+
+// Enhanced Type Chart
+const TYPE_CHART = {
+  fire: { grass: 2, water: 0.5, fire: 0.5, bug: 2, ice: 2, steel: 2, rock: 0.5, dragon: 0.5 },
+  water: { fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5 },
+  grass: { water: 2, grass: 0.5, fire: 0.5, ground: 2, rock: 2, flying: 0.5, poison: 0.5, bug: 0.5, steel: 0.5, dragon: 0.5 },
+  electric: { water: 2, electric: 0.5, grass: 0.5, ground: 0, flying: 2, dragon: 0.5 },
+  normal: { rock: 0.5, ghost: 0, steel: 0.5 },
+  flying: { grass: 2, fighting: 2, bug: 2, electric: 0.5, rock: 0.5, steel: 0.5 },
+  poison: { grass: 2, fairy: 2, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0 },
+  ground: { fire: 2, electric: 2, poison: 2, rock: 2, steel: 2, grass: 0.5, bug: 0.5, flying: 0 },
+  rock: { fire: 2, ice: 2, flying: 2, bug: 2, fighting: 0.5, ground: 0.5, steel: 0.5 },
+  bug: { grass: 2, psychic: 2, dark: 2, fire: 0.5, fighting: 0.5, poison: 0.5, flying: 0.5, ghost: 0.5, steel: 0.5, fairy: 0.5 },
+  ghost: { ghost: 2, psychic: 2, normal: 0, dark: 0.5 },
+  steel: { ice: 2, rock: 2, fairy: 2, fire: 0.5, water: 0.5, electric: 0.5, steel: 0.5 },
+  ice: { grass: 2, ground: 2, flying: 2, dragon: 2, fire: 0.5, water: 0.5, ice: 0.5, steel: 0.5 },
+};
+
+function getEffectiveness(moveType, targetTypes) {
+  let mult = 1;
+  targetTypes.forEach(t => {
+    if (TYPE_CHART[moveType] && TYPE_CHART[moveType][t] !== undefined) {
+      mult *= TYPE_CHART[moveType][t];
+    }
+  });
+  return mult;
+}
+
+function calculateStat(base, level, iv = 15, ev = 0, isHP = false) {
+  if (isHP) {
+    return Math.floor(((base * 2 + iv + Math.floor(ev / 4)) * level) / 100) + level + 10;
+  }
+  return Math.floor(((base * 2 + iv + Math.floor(ev / 4)) * level) / 100) + 5;
 }
 
 async function drawBattleSprites() {
@@ -395,11 +457,11 @@ async function drawBattleSprites() {
     img.src = enemyData.sprites.front;
     img.onload = () => {
       ectx.imageSmoothingEnabled = false;
-      ectx.drawImage(img, 0, 0, ec.width, ec.height);
+      // Draw centered and larger
+      const scale = 2;
+      const sw = img.width * scale, sh = img.height * scale;
+      ectx.drawImage(img, (ec.width - sw) / 2, (ec.height - sh) / 2, sw, sh);
     };
-  } else {
-    const enemySprite = (wildPokemon.species === 'charmander') ? SPRITES.charmanderFront : SPRITES.bulbasaur;
-    drawPixelArt(ectx, enemySprite, 8, 6, 6);
   }
 
   const pc = document.getElementById('player-back-sprite');
@@ -413,10 +475,10 @@ async function drawBattleSprites() {
     img.src = playerData.sprites.back;
     img.onload = () => {
       pctx.imageSmoothingEnabled = false;
-      pctx.drawImage(img, 0, 0, pc.width, pc.height);
+      const scale = 2.5; // Back sprite usually looks better even larger
+      const sw = img.width * scale, sh = img.height * scale;
+      pctx.drawImage(img, (pc.width - sw) / 2, (pc.height - sh) / 2, sw, sh);
     };
-  } else {
-    drawPixelArt(pctx, SPRITES.charmanderBack, 4, 2, 6);
   }
 }
 
@@ -1115,34 +1177,60 @@ function processMovement() {
 // ══════════════════════════════════════════════
 const battle = {
   playerHP: 20, playerMaxHP: 20, enemyHP: 18, enemyMaxHP: 18,
-  playerAtk: 6, enemyAtk: 5, turn: 'player', busy: false,
+  playerStats: {}, enemyStats: {},
+  playerLevel: 5, enemyLevel: 5,
+  turn: 'player', busy: false,
   playerData: null, enemyData: null,
   playerMoves: [], enemyMoves: [],
+  playerStatus: null, enemyStatus: null, // 'burn', 'para', 'poison', 'sleep', 'freeze'
 };
 
 async function startBattle() {
   gameState = 'battle';
-  battle.playerHP = battle.playerMaxHP; battle.enemyHP = battle.enemyMaxHP;
-  battle.turn = 'player'; battle.busy = true; // Still loading
+  battle.turn = 'player'; battle.busy = true;
   const trans = document.getElementById('battle-transition');
   trans.style.display = 'block';
 
-  // Pre-fetch both participant data
+  // Random level for wild pokémon 2-7
+  battle.enemyLevel = 2 + Math.floor(Math.random() * 6);
+  battle.playerLevel = 5;
+
   const [pData, eData] = await Promise.all([
-    fetchPokemonData('charmander'),
-    fetchPokemonData(wildPokemon.species || 'bulbasaur')
+    fetchPokemonData('charmander', battle.playerLevel),
+    fetchPokemonData(wildPokemon.species || 'bulbasaur', battle.enemyLevel)
   ]);
+
   battle.playerData = pData;
   battle.enemyData = eData;
-  battle.playerMoves = pData ? pData.moves : [
-    { name: 'EMBER', power: 40, pp: 25, type: 'fire' },
-    { name: 'SCRATCH', power: 40, pp: 35, type: 'normal' }
-  ];
-  battle.enemyMoves = eData ? eData.moves : [
-    { name: 'TACKLE', power: 40, pp: 35, type: 'normal' }
-  ];
 
-  // Update UI button texts for player moves
+  // Calculate Stats
+  const pBase = pData.baseStats;
+  const eBase = eData.baseStats;
+
+  battle.playerMaxHP = calculateStat(pBase.hp, battle.playerLevel, 31, 100, true);
+  battle.playerHP = battle.playerMaxHP;
+  battle.playerStats = {
+    atk: calculateStat(pBase.attack, battle.playerLevel),
+    def: calculateStat(pBase.defense, battle.playerLevel),
+    spAtk: calculateStat(pBase['special-attack'], battle.playerLevel),
+    spDef: calculateStat(pBase['special-defense'], battle.playerLevel),
+    speed: calculateStat(pBase.speed, battle.playerLevel),
+  };
+
+  battle.enemyMaxHP = calculateStat(eBase.hp, battle.enemyLevel, 15, 0, true);
+  battle.enemyHP = battle.enemyMaxHP;
+  battle.enemyStats = {
+    atk: calculateStat(eBase.attack, battle.enemyLevel),
+    def: calculateStat(eBase.defense, battle.enemyLevel),
+    spAtk: calculateStat(eBase['special-attack'], battle.enemyLevel),
+    spDef: calculateStat(eBase['special-defense'], battle.enemyLevel),
+    speed: calculateStat(eBase.speed, battle.enemyLevel),
+  };
+
+  battle.playerMoves = pData.moves;
+  battle.enemyMoves = eData.moves;
+
+  // UI Setup
   battle.playerMoves.forEach((m, i) => {
     const btn = document.getElementById(`move${i + 1}-btn`);
     if (btn) {
@@ -1150,7 +1238,6 @@ async function startBattle() {
       btn.style.display = 'block';
     }
   });
-  // Hide unused move buttons
   for (let i = battle.playerMoves.length; i < 4; i++) {
     const btn = document.getElementById(`move${i + 1}-btn`);
     if (btn) btn.style.display = 'none';
@@ -1161,17 +1248,19 @@ async function startBattle() {
     document.getElementById('overworld').style.display = 'none';
     document.getElementById('battle-screen').style.display = 'flex';
     document.getElementById('farm-hud').style.display = 'none';
-    const wildName = battle.enemyData ? battle.enemyData.name : (wildPokemon.species ? wildPokemon.species.toUpperCase() : 'POKÉMON');
-    document.getElementById('enemy-name').textContent = wildName;
-    document.getElementById('player-poke-name').textContent = battle.playerData ? battle.playerData.name : 'CHARMANDER';
+
+    document.getElementById('enemy-name').textContent = battle.enemyData.name;
+    document.getElementById('enemy-level').textContent = 'Lv' + battle.enemyLevel;
+    document.getElementById('player-poke-name').textContent = battle.playerData.name;
+    document.getElementById('player-level').textContent = 'Lv' + battle.playerLevel;
 
     drawBattleSprites();
     updateHPBars();
     battle.busy = false;
 
-    showBattleMsg(`A wild ${wildName} appeared!`, () => {
-      showBattleMsg(`Go! ${document.getElementById('player-poke-name').textContent}!`, () =>
-        showBattleMsg(`What will ${document.getElementById('player-poke-name').textContent} do?`, showActions)
+    showBattleMsg(`A wild ${battle.enemyData.name} appeared!`, () => {
+      showBattleMsg(`Go! ${battle.playerData.name}!`, () =>
+        showBattleMsg(`What will ${battle.playerData.name} do?`, showActions)
       );
     });
   }, 700);
@@ -1206,11 +1295,29 @@ function updateHPBars() {
   const eBar = document.getElementById('enemy-hp-bar');
   eBar.style.width = ePct + '%';
   eBar.className = 'hp-bar ' + (ePct > 50 ? 'hp-high' : ePct > 25 ? 'hp-mid' : 'hp-low');
+
   const pPct = Math.max(0, (battle.playerHP / battle.playerMaxHP) * 100);
   const pBar = document.getElementById('player-hp-bar');
   pBar.style.width = pPct + '%';
   pBar.className = 'hp-bar ' + (pPct > 50 ? 'hp-high' : pPct > 25 ? 'hp-mid' : 'hp-low');
   document.getElementById('player-hp-text').textContent = battle.playerHP + '/' + battle.playerMaxHP;
+
+  updateStatusDisplay();
+}
+
+function updateStatusDisplay() {
+  const ps = document.getElementById('player-status');
+  const es = document.getElementById('enemy-status');
+
+  [{ s: battle.playerStatus, el: ps }, { s: battle.enemyStatus, el: es }].forEach(tag => {
+    tag.el.className = 'status-tag';
+    if (tag.s) {
+      tag.el.classList.add('status-' + tag.s.substring(0, 3));
+      tag.el.textContent = tag.s.substring(0, 3).toUpperCase();
+    } else {
+      tag.el.textContent = '';
+    }
+  });
 }
 
 let _twTimer = null;
@@ -1261,50 +1368,165 @@ document.getElementById('run-btn').addEventListener('click', () => {
   });
 });
 
+function calculateDamage(move, attacker, defender, aLevel, dData, aStatus) {
+  if (!move.power) return { amount: 0, effectiveness: 1 };
+
+  // Choose Physical or Special attack/defense
+  let aStat = move.category === 'special' ? attacker.spAtk : attacker.atk;
+  const dStat = move.category === 'special' ? defender.spDef : defender.def;
+
+  // Burn Penalty: lowers Attack by 50%
+  if (aStatus === 'burn' && move.category === 'physical') {
+    aStat = Math.floor(aStat * 0.5);
+  }
+
+  // Base Damage
+  let dmg = ((((2 * aLevel / 5) + 2) * move.power * (aStat / dStat)) / 50) + 2;
+
+  // Multipliers
+  const effectiveness = getEffectiveness(move.type, dData.types);
+  dmg *= effectiveness;
+
+  // Random variance [0.85, 1.0]
+  dmg *= (Math.random() * (1 - 0.85) + 0.85);
+
+  return { amount: Math.max(1, Math.floor(dmg)), effectiveness };
+}
+
+function checkMoveSuccess(move, status) {
+  // Check accuracy
+  if (move.accuracy && Math.random() * 100 > move.accuracy) return { hit: false, msg: "The attack missed!" };
+
+  // Status check
+  if (status === 'sleep') return { hit: false, msg: "is fast asleep!" };
+  if (status === 'freeze') return { hit: false, msg: "is frozen solid!" };
+  if (status === 'paralyzed' && Math.random() < 0.25) return { hit: false, msg: "is paralyzed! It can't move!" };
+
+  return { hit: true };
+}
+
+function handleStatusChance(move, targetStatus) {
+  if (!move.effect_chance) return null;
+  if (targetStatus) return null; // Already has a status
+
+  if (Math.random() * 100 < move.effect_chance) {
+    // Simplified effect parsing
+    if (move.name.includes('EMBER')) return 'burn';
+    if (move.name.includes('THUNDER') || move.name.includes('BOLT')) return 'paralyzed';
+    if (move.name.includes('ICE') || move.name.includes('POWDER')) return 'freeze';
+    if (move.name.includes('SLUDGE') || move.name.includes('POISON')) return 'poison';
+    if (move.name.includes('HYPNOSIS') || move.name.includes('SLEEP')) return 'sleep';
+  }
+  return null;
+}
+
 function useMove(idx) {
   if (battle.busy) return;
   battle.busy = true; hideBattleUI(); setActionBtnsDisabled(true);
   const move = battle.playerMoves[idx];
-  const pName = battle.playerData ? battle.playerData.name : 'CHARMANDER';
-  const eName = battle.enemyData ? battle.enemyData.name : 'ENEMY';
+  const pName = battle.playerData.name;
+  const eName = battle.enemyData.name;
 
-  let dmg = 0;
-  if (move.power > 0) {
-    // Simplified damage formula using power
-    dmg = Math.max(1, Math.floor((move.power / 10) + Math.random() * 3));
-    battle.enemyHP = Math.max(0, battle.enemyHP - dmg);
+  const success = checkMoveSuccess(move, battle.playerStatus);
+  if (!success.hit) {
+    showBattleMsg(`${pName} ${success.msg}`, () => setTimeout(enemyTurn, 800));
+    return;
   }
+
+  const result = calculateDamage(move, battle.playerStats, battle.enemyStats, battle.playerLevel, battle.enemyData, battle.playerStatus);
+  battle.enemyHP = Math.max(0, battle.enemyHP - result.amount);
+
+  // Check for status effect application
+  const newStatus = handleStatusChance(move, battle.enemyStatus);
+  if (newStatus) battle.enemyStatus = newStatus;
 
   updateHPBars();
   const es = document.getElementById('enemy-sprite');
-  if (dmg > 0) { es.classList.add('hit-flash'); setTimeout(() => es.classList.remove('hit-flash'), 450); }
+  if (result.amount > 0) { es.classList.add('hit-flash'); setTimeout(() => es.classList.remove('hit-flash'), 450); }
 
-  showBattleMsg(`${pName} used ${move.name}!\nDealt ${dmg} damage!`, () => {
+  let msg = `${pName} used ${move.name}!`;
+  if (result.effectiveness > 1) msg += "\nIt's super effective!";
+  if (result.effectiveness < 1 && result.effectiveness > 0) msg += "\nIt's not very effective...";
+  if (result.effectiveness === 0) msg += "\nIt had no effect...";
+  if (newStatus) msg += `\n${eName} was ${newStatus}!`;
+
+  showBattleMsg(msg, () => {
     if (battle.enemyHP <= 0) {
       showBattleMsg(`${eName} fainted!`, () => endBattle(true));
       return;
     }
-    setTimeout(enemyTurn, 400);
+    setTimeout(enemyTurn, 600);
   });
 }
 
 function enemyTurn() {
-  const eName = battle.enemyData ? battle.enemyData.name : 'ENEMY';
-  const pName = battle.playerData ? battle.playerData.name : 'CHARMANDER';
+  const eName = battle.enemyData.name;
+  const pName = battle.playerData.name;
 
-  const move = battle.enemyMoves[Math.floor(Math.random() * battle.enemyMoves.length)] || { name: 'TACKLE', power: 40 };
-  const dmg = Math.max(1, Math.floor((move.power / 10) + Math.random() * 3));
+  const success = checkMoveSuccess({ accuracy: 100 }, battle.enemyStatus);
+  if (!success.hit) {
+    showBattleMsg(`${eName} ${success.msg}`, () => endTurnProcess());
+    return;
+  }
 
-  battle.playerHP = Math.max(0, battle.playerHP - dmg);
+  const move = battle.enemyMoves[Math.floor(Math.random() * battle.enemyMoves.length)] || { name: 'TACKLE', power: 40, category: 'physical', type: 'normal', accuracy: 100 };
+  const result = calculateDamage(move, battle.enemyStats, battle.playerStats, battle.enemyLevel, battle.playerData, battle.enemyStatus);
+
+  battle.playerHP = Math.max(0, battle.playerHP - result.amount);
+
+  const newStatus = handleStatusChance(move, battle.playerStatus);
+  if (newStatus) battle.playerStatus = newStatus;
+
   updateHPBars();
-
   const ps = document.getElementById('player-back-sprite');
   ps.classList.add('shake'); setTimeout(() => ps.classList.remove('shake'), 350);
 
-  showBattleMsg(`${eName} used ${move.name}!\nDealt ${dmg} damage!`, () => {
-    battle.busy = false;
+  let msg = `${eName} used ${move.name}!`;
+  if (result.effectiveness > 1) msg += "\nIt's super effective!";
+  if (result.effectiveness < 1 && result.effectiveness > 0) msg += "\nIt's not very effective...";
+  if (result.effectiveness === 0) msg += "\nIt had no effect...";
+  if (newStatus) msg += `\n${pName} was ${newStatus}!`;
+
+  showBattleMsg(msg, () => {
     if (battle.playerHP <= 0) { showBattleMsg(`${pName} fainted!`, () => endBattle(false)); return; }
-    showActions();
+    endTurnProcess();
+  });
+}
+
+function endTurnProcess() {
+  // Turn wrap up: status damage
+  const checkStatusDamage = (status, hp, maxHP, name) => {
+    if (status === 'poison' || status === 'burn') {
+      const dmg = Math.floor(maxHP / 8);
+      return { dmg, msg: `${name} is hurt by its ${status}!` };
+    }
+    return null;
+  };
+
+  const pSt = checkStatusDamage(battle.playerStatus, battle.playerHP, battle.playerMaxHP, battle.playerData.name);
+  const eSt = checkStatusDamage(battle.enemyStatus, battle.enemyHP, battle.enemyMaxHP, battle.enemyData.name);
+
+  const applyRes = (res, target, hpKey, next) => {
+    if (res) {
+      battle[hpKey] = Math.max(0, battle[hpKey] - res.dmg);
+      updateHPBars();
+      showBattleMsg(res.msg, () => {
+        if (battle[hpKey] <= 0) {
+          showBattleMsg(`${res.msg.split(' ')[0]} fainted!`, () => endBattle(target === 'player' ? false : true));
+        } else {
+          next();
+        }
+      });
+    } else {
+      next();
+    }
+  };
+
+  applyRes(pSt, 'player', 'playerHP', () => {
+    applyRes(eSt, 'enemy', 'enemyHP', () => {
+      battle.busy = false;
+      showActions();
+    });
   });
 }
 
