@@ -91,6 +91,13 @@ function harvestPlot(tx, ty) {
   const key = getFarmKey(tx, ty);
   const plot = farmPlots[key];
   if (!plot || plot.stage !== STAGE_READY) return false;
+
+  // RULE: Check if a wild pokemon is currently targeting or eating this crop
+  if (wildPokemon.active && wildPokemon.targetCropKey === key) {
+    showOverworldMsg("this plant is being targeted,\nthwart the wild pokemon so that\nit can't eat it");
+    return false;
+  }
+
   const berry = BERRIES.find(b => b.id === plot.berryId);
   const amt = berry ? berry.yield : 2;
   berryBag[plot.berryId] = (berryBag[plot.berryId] || 0) + amt;
@@ -971,6 +978,31 @@ function closeBerryMenu() {
 
 document.getElementById('berry-cancel-btn').addEventListener('click', closeBerryMenu);
 
+// ── Overworld Dialogue ─────────────────────────
+let _owMsgTimer = null;
+function showOverworldMsg(text, cb) {
+  if (_owMsgTimer) clearInterval(_owMsgTimer);
+  gameState = 'overworld-dialogue';
+  const overlay = document.getElementById('message-overlay');
+  const el = document.getElementById('overworld-msg');
+  overlay.style.display = 'block';
+  el.textContent = '';
+  let i = 0;
+  _owMsgTimer = setInterval(() => {
+    el.textContent += text[i++];
+    if (i >= text.length) {
+      clearInterval(_owMsgTimer);
+      _owMsgTimer = null;
+      if (cb) setTimeout(cb, 600);
+    }
+  }, 30);
+}
+
+function closeOverworldMsg() {
+  document.getElementById('message-overlay').style.display = 'none';
+  gameState = 'overworld';
+}
+
 // ══════════════════════════════════════════════
 //  INPUT
 // ══════════════════════════════════════════════
@@ -996,6 +1028,10 @@ document.getElementById('btn-a').addEventListener('click', handleAPress);
 document.getElementById('btn-b').addEventListener('click', handleBPress);
 
 function handleAPress() {
+  if (gameState === 'overworld-dialogue') {
+    if (!_owMsgTimer) closeOverworldMsg();
+    return;
+  }
   if (gameState === 'berry-menu') {
     if (selectedBerryIndex >= 0 && berryButtons[selectedBerryIndex]) {
       if (!berryButtons[selectedBerryIndex].disabled) {

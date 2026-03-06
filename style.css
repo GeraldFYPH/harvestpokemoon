@@ -422,3 +422,22 @@ html, body {
   gap: 10px;
 }
 .farm-hud-row span { color: var(--gb-mid); }
+
+/* ── OVERWORLD MESSAGE OVERLAY ── */
+#message-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  display: none;
+  background: var(--gb-black);
+  border-top: 4px solid var(--gb-dark-green);
+  padding: 18px 22px;
+  z-index: 150;
+  min-height: 100px;
+}
+
+#overworld-msg {
+  font-size: 11px;
+  color: var(--gb-green);
+  line-height: 1.8;
+  white-space: pre-line;
+}
