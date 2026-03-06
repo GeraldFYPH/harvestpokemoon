@@ -28,6 +28,12 @@ let bulbasaurReady = false;
 bulbasaurSheet.onload = () => { bulbasaurReady = true; };
 bulbasaurSheet.onerror = () => { console.warn('bulbasaur.png not found — using fallback.'); };
 
+const charmanderSheet = new Image();
+charmanderSheet.src = 'pokemon assets/overworld/charmander.png';
+let charmanderReady = false;
+charmanderSheet.onload = () => { charmanderReady = true; };
+charmanderSheet.onerror = () => { console.warn('charmander.png not found — using fallback.'); };
+
 const farmTileImg = new Image();
 farmTileImg.src = 'map assets/emptyplot.png';
 let farmPlotReady = false;
@@ -326,16 +332,85 @@ const SPRITES = {
   })(),
 };
 
-function drawBattleSprites() {
+// ══════════════════════════════════════════════
+//  POKEMON DATA API (PokéAPI)
+// ══════════════════════════════════════════════
+const pokemonDataCache = {};
+
+async function fetchPokemonData(species) {
+  if (pokemonDataCache[species]) return pokemonDataCache[species];
+  try {
+    const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${species.toLowerCase()}`);
+    const data = await res.json();
+    const movesPromises = data.moves
+      .filter(m => m.version_group_details.some(v => v.move_learn_method.name === 'level-up'))
+      .slice(0, 4)
+      .map(async m => {
+        try {
+          const mRes = await fetch(m.move.url);
+          const mData = await mRes.json();
+          return {
+            name: m.move.name.toUpperCase().replace('-', ' '),
+            power: mData.power || 40,
+            pp: mData.pp || 35,
+            type: mData.type.name
+          };
+        } catch (e) {
+          return { name: m.move.name.toUpperCase().replace('-', ' '), power: 40, pp: 35, type: 'normal' };
+        }
+      });
+    const moves = await Promise.all(movesPromises);
+    const processedData = {
+      name: data.name.toUpperCase(),
+      sprites: {
+        front: data.sprites.front_default,
+        back: data.sprites.back_default,
+      },
+      moves: moves.length > 0 ? moves : [{ name: 'TACKLE', power: 40, pp: 35, type: 'normal' }]
+    };
+    pokemonDataCache[species] = processedData;
+    return processedData;
+  } catch (err) {
+    console.warn(`PokéAPI fetch failed for ${species}:`, err);
+    return null;
+  }
+}
+
+async function drawBattleSprites() {
   const ec = document.getElementById('enemy-sprite');
   const ectx = ec.getContext('2d');
   ectx.clearRect(0, 0, ec.width, ec.height);
-  const enemySprite = (wildPokemon.species === 'charmander') ? SPRITES.charmanderFront : SPRITES.bulbasaur;
-  drawPixelArt(ectx, enemySprite, 8, 6, 6);
+
+  const enemyData = await fetchPokemonData(wildPokemon.species || 'bulbasaur');
+  if (enemyData && enemyData.sprites.front) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = enemyData.sprites.front;
+    img.onload = () => {
+      ectx.imageSmoothingEnabled = false;
+      ectx.drawImage(img, 0, 0, ec.width, ec.height);
+    };
+  } else {
+    const enemySprite = (wildPokemon.species === 'charmander') ? SPRITES.charmanderFront : SPRITES.bulbasaur;
+    drawPixelArt(ectx, enemySprite, 8, 6, 6);
+  }
+
   const pc = document.getElementById('player-back-sprite');
   const pctx = pc.getContext('2d');
   pctx.clearRect(0, 0, pc.width, pc.height);
-  drawPixelArt(pctx, SPRITES.charmanderBack, 4, 2, 6);
+
+  const playerData = await fetchPokemonData('charmander');
+  if (playerData && playerData.sprites.back) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = playerData.sprites.back;
+    img.onload = () => {
+      pctx.imageSmoothingEnabled = false;
+      pctx.drawImage(img, 0, 0, pc.width, pc.height);
+    };
+  } else {
+    drawPixelArt(pctx, SPRITES.charmanderBack, 4, 2, 6);
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -546,7 +621,6 @@ function drawWildPokemon(camX, camY) {
   // Animated sprite
   if (wp.species === 'bulbasaur' && bulbasaurReady) {
     const row = DIR_ROW[wp.dir] ?? 0;
-    // Same time-based walk animation as the player: strictly walk1 ↔ walk2.
     const moving = (wp.state === 'entering' || wp.state === 'seeking' || wp.state === 'fleeing');
     let col = 0;
     if (moving) {
@@ -557,6 +631,21 @@ function drawWildPokemon(camX, camY) {
     const offsetX = Math.round((drawW - TILE * scaleX) / 2);
     ctx.drawImage(
       bulbasaurSheet,
+      col * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H,
+      sx - offsetX, sy - Math.round(TILE * scaleY), drawW, drawH
+    );
+  } else if (wp.species === 'charmander' && charmanderReady) {
+    const row = DIR_ROW[wp.dir] ?? 0;
+    const moving = (wp.state === 'entering' || wp.state === 'seeking' || wp.state === 'fleeing');
+    let col = 0;
+    if (moving) {
+      col = (Math.floor(Date.now() / 160) % 2 === 0) ? 1 : 2;
+    }
+    const drawW = Math.round(TILE * 2 * scaleX);
+    const drawH = Math.round(TILE * 2 * scaleY);
+    const offsetX = Math.round((drawW - TILE * scaleX) / 2);
+    ctx.drawImage(
+      charmanderSheet,
       col * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H,
       sx - offsetX, sy - Math.round(TILE * scaleY), drawW, drawH
     );
@@ -991,31 +1080,63 @@ function processMovement() {
 const battle = {
   playerHP: 20, playerMaxHP: 20, enemyHP: 18, enemyMaxHP: 18,
   playerAtk: 6, enemyAtk: 5, turn: 'player', busy: false,
-  moves: [
-    { name: 'EMBER', power: 8, pp: 10, type: 'fire' },
-    { name: 'SCRATCH', power: 5, pp: 15, type: 'normal' },
-    { name: 'GROWL', power: 0, pp: 20, type: 'normal', effect: 'lower_atk' },
-    { name: 'TAIL WHIP', power: 0, pp: 20, type: 'normal', effect: 'lower_def' },
-  ],
+  playerData: null, enemyData: null,
+  playerMoves: [], enemyMoves: [],
 };
 
-function startBattle() {
+async function startBattle() {
   gameState = 'battle';
   battle.playerHP = battle.playerMaxHP; battle.enemyHP = battle.enemyMaxHP;
-  battle.turn = 'player'; battle.busy = false;
+  battle.turn = 'player'; battle.busy = true; // Still loading
   const trans = document.getElementById('battle-transition');
   trans.style.display = 'block';
+
+  // Pre-fetch both participant data
+  const [pData, eData] = await Promise.all([
+    fetchPokemonData('charmander'),
+    fetchPokemonData(wildPokemon.species || 'bulbasaur')
+  ]);
+  battle.playerData = pData;
+  battle.enemyData = eData;
+  battle.playerMoves = pData ? pData.moves : [
+    { name: 'EMBER', power: 40, pp: 25, type: 'fire' },
+    { name: 'SCRATCH', power: 40, pp: 35, type: 'normal' }
+  ];
+  battle.enemyMoves = eData ? eData.moves : [
+    { name: 'TACKLE', power: 40, pp: 35, type: 'normal' }
+  ];
+
+  // Update UI button texts for player moves
+  battle.playerMoves.forEach((m, i) => {
+    const btn = document.getElementById(`move${i + 1}-btn`);
+    if (btn) {
+      btn.textContent = m.name;
+      btn.style.display = 'block';
+    }
+  });
+  // Hide unused move buttons
+  for (let i = battle.playerMoves.length; i < 4; i++) {
+    const btn = document.getElementById(`move${i + 1}-btn`);
+    if (btn) btn.style.display = 'none';
+  }
+
   setTimeout(() => {
     trans.style.display = 'none';
     document.getElementById('overworld').style.display = 'none';
     document.getElementById('battle-screen').style.display = 'flex';
     document.getElementById('farm-hud').style.display = 'none';
-    const wildName = wildPokemon.species ? wildPokemon.species.toUpperCase() : 'POKÉMON';
+    const wildName = battle.enemyData ? battle.enemyData.name : (wildPokemon.species ? wildPokemon.species.toUpperCase() : 'POKÉMON');
     document.getElementById('enemy-name').textContent = wildName;
+    document.getElementById('player-poke-name').textContent = battle.playerData ? battle.playerData.name : 'CHARMANDER';
+
     drawBattleSprites();
     updateHPBars();
+    battle.busy = false;
+
     showBattleMsg(`A wild ${wildName} appeared!`, () => {
-      showBattleMsg('Go! CHARMANDER!', () => showBattleMsg('What will CHARMANDER do?', showActions));
+      showBattleMsg(`Go! ${document.getElementById('player-poke-name').textContent}!`, () =>
+        showBattleMsg(`What will ${document.getElementById('player-poke-name').textContent} do?`, showActions)
+      );
     });
   }, 700);
 }
@@ -1107,27 +1228,46 @@ document.getElementById('run-btn').addEventListener('click', () => {
 function useMove(idx) {
   if (battle.busy) return;
   battle.busy = true; hideBattleUI(); setActionBtnsDisabled(true);
-  const move = battle.moves[idx]; let dmg = 0;
-  if (move.power > 0) { dmg = Math.max(1, Math.floor(move.power + Math.random() * 3 - 1)); battle.enemyHP = Math.max(0, battle.enemyHP - dmg); }
-  if (move.effect === 'lower_atk') battle.enemyAtk = Math.max(1, battle.enemyAtk - 1);
+  const move = battle.playerMoves[idx];
+  const pName = battle.playerData ? battle.playerData.name : 'CHARMANDER';
+  const eName = battle.enemyData ? battle.enemyData.name : 'ENEMY';
+
+  let dmg = 0;
+  if (move.power > 0) {
+    // Simplified damage formula using power
+    dmg = Math.max(1, Math.floor((move.power / 10) + Math.random() * 3));
+    battle.enemyHP = Math.max(0, battle.enemyHP - dmg);
+  }
+
   updateHPBars();
   const es = document.getElementById('enemy-sprite');
   if (dmg > 0) { es.classList.add('hit-flash'); setTimeout(() => es.classList.remove('hit-flash'), 450); }
-  showBattleMsg(dmg > 0 ? `CHARMANDER used ${move.name}!\nDealt ${dmg} damage!` : `CHARMANDER used ${move.name}!`, () => {
-    if (battle.enemyHP <= 0) { showBattleMsg('BULBASAUR fainted!', () => endBattle(true)); return; }
+
+  showBattleMsg(`${pName} used ${move.name}!\nDealt ${dmg} damage!`, () => {
+    if (battle.enemyHP <= 0) {
+      showBattleMsg(`${eName} fainted!`, () => endBattle(true));
+      return;
+    }
     setTimeout(enemyTurn, 400);
   });
 }
 
 function enemyTurn() {
-  const dmg = Math.max(1, Math.floor(battle.enemyAtk + Math.random() * 3 - 1));
-  battle.playerHP = Math.max(0, battle.playerHP - dmg); updateHPBars();
+  const eName = battle.enemyData ? battle.enemyData.name : 'ENEMY';
+  const pName = battle.playerData ? battle.playerData.name : 'CHARMANDER';
+
+  const move = battle.enemyMoves[Math.floor(Math.random() * battle.enemyMoves.length)] || { name: 'TACKLE', power: 40 };
+  const dmg = Math.max(1, Math.floor((move.power / 10) + Math.random() * 3));
+
+  battle.playerHP = Math.max(0, battle.playerHP - dmg);
+  updateHPBars();
+
   const ps = document.getElementById('player-back-sprite');
   ps.classList.add('shake'); setTimeout(() => ps.classList.remove('shake'), 350);
-  const mn = ['TACKLE', 'VINE WHIP'][Math.floor(Math.random() * 2)];
-  showBattleMsg(`BULBASAUR used ${mn}!\nDealt ${dmg} damage!`, () => {
+
+  showBattleMsg(`${eName} used ${move.name}!\nDealt ${dmg} damage!`, () => {
     battle.busy = false;
-    if (battle.playerHP <= 0) { showBattleMsg('CHARMANDER fainted!', () => endBattle(false)); return; }
+    if (battle.playerHP <= 0) { showBattleMsg(`${pName} fainted!`, () => endBattle(false)); return; }
     showActions();
   });
 }
