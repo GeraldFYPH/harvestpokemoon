@@ -407,17 +407,24 @@ const PokeBattleEngine = (() => {
     events.push({ type: 'message', text });
   }
 
-  function pushSync(events, side, reason) {
-    events.push({ type: 'sync', side, reason });
+  function captureBattleFrame(state) {
+    return clone({
+      player: state.battlers.player,
+      enemy: state.battlers.enemy
+    });
+  }
+
+  function pushSync(events, state, side, reason) {
+    events.push({ type: 'sync', side, reason, frame: captureBattleFrame(state) });
   }
 
   function pushAnimation(events, side, animation) {
     events.push({ type: 'animation', side, animation });
   }
 
-  function applyHP(events, battler, nextHP, reason) {
+  function applyHP(state, events, battler, nextHP, reason) {
     battler.currentHP = Math.max(0, Math.min(battler.maxHP, nextHP));
-    pushSync(events, battler.side, reason);
+    pushSync(events, state, battler.side, reason);
   }
 
   function isFainted(battler) {
@@ -555,19 +562,22 @@ const PokeBattleEngine = (() => {
     return 0;
   }
 
-  function applyStageChange(events, battler, statName, delta) {
+  function applyStageChange(state, events, battler, statName, delta) {
     const current = battler.statStages[statName] || 0;
     const next = Math.max(-6, Math.min(6, current + delta));
     const actualDelta = next - current;
     battler.statStages[statName] = next;
-    if (actualDelta === 0) return;
+    if (actualDelta === 0) {
+      pushMessage(events, `${battler.name}'s ${capitalizeName(statName)} won't go any ${delta > 0 ? 'higher' : 'lower'}!`);
+      return;
+    }
 
     const label = capitalizeName(statName);
     if (actualDelta > 1) pushMessage(events, `${battler.name}'s ${label} rose sharply!`);
     else if (actualDelta === 1) pushMessage(events, `${battler.name}'s ${label} rose!`);
     else if (actualDelta < -1) pushMessage(events, `${battler.name}'s ${label} harshly fell!`);
     else pushMessage(events, `${battler.name}'s ${label} fell!`);
-    pushSync(events, battler.side, 'stat-stage');
+    pushSync(events, state, battler.side, 'stat-stage');
   }
 
   function resolveStatChangeTarget(move, actor, target) {
@@ -590,11 +600,11 @@ const PokeBattleEngine = (() => {
       actor.status.turnsRemaining -= 1;
       if (actor.status.turnsRemaining <= 0) {
         actor.status = null;
-        pushSync(events, actor.side, 'wake-up');
+        pushSync(events, state, actor.side, 'wake-up');
         pushMessage(events, `${actor.name} woke up!`);
       } else if (!SLEEP_USABLE_MOVES.has(move.id)) {
         pushMessage(events, `${actor.name} is fast asleep!`);
-        pushSync(events, actor.side, 'sleep-turn');
+        pushSync(events, state, actor.side, 'sleep-turn');
         return false;
       }
     }
@@ -603,7 +613,7 @@ const PokeBattleEngine = (() => {
       const thawed = THAWING_MOVES.has(move.id) || Math.random() < 0.2;
       if (thawed) {
         actor.status = null;
-        pushSync(events, actor.side, 'thaw');
+        pushSync(events, state, actor.side, 'thaw');
         pushMessage(events, `${actor.name} thawed out!`);
       } else {
         pushMessage(events, `${actor.name} is frozen solid!`);
@@ -620,13 +630,13 @@ const PokeBattleEngine = (() => {
       actor.volatile.confusion.turnsRemaining -= 1;
       if (actor.volatile.confusion.turnsRemaining <= 0) {
         actor.volatile.confusion = null;
-        pushSync(events, actor.side, 'confusion-ended');
+        pushSync(events, state, actor.side, 'confusion-ended');
         pushMessage(events, `${actor.name} snapped out of confusion!`);
       } else {
         pushMessage(events, `${actor.name} is confused!`);
         if (Math.random() < (1 / 3)) {
           const selfDamage = getSelfHitDamage(actor);
-          applyHP(events, actor, actor.currentHP - selfDamage, 'confusion-self-hit');
+          applyHP(state, events, actor, actor.currentHP - selfDamage, 'confusion-self-hit');
           pushAnimation(events, actor.side, 'self-hit');
           pushMessage(events, `It hurt itself in its confusion!`);
           if (isFainted(actor)) {
@@ -669,14 +679,14 @@ const PokeBattleEngine = (() => {
     if (move.healing > 0) {
       const recovered = Math.max(1, Math.floor(actor.maxHP * (move.healing / 100)));
       if (actor.currentHP < actor.maxHP) {
-        applyHP(events, actor, actor.currentHP + recovered, 'heal');
+        applyHP(state, events, actor, actor.currentHP + recovered, 'heal');
         pushMessage(events, `${actor.name} regained health!`);
       }
     }
 
     if (move.drain > 0 && damageResult.amount > 0) {
       const recovered = Math.max(1, Math.floor(damageResult.amount * (move.drain / 100)));
-      applyHP(events, actor, actor.currentHP + recovered, 'drain-heal');
+      applyHP(state, events, actor, actor.currentHP + recovered, 'drain-heal');
       pushMessage(events, `${actor.name} restored a little HP!`);
     }
 
@@ -686,11 +696,11 @@ const PokeBattleEngine = (() => {
       if (Math.random() * 100 < ailmentChance && await canApplyStatus(state, actor, recipient, move, move.ailment)) {
         if (move.ailment === 'confusion') {
           recipient.volatile.confusion = applyConfusionStatus(recipient, move);
-          pushSync(events, recipient.side, 'confusion-applied');
+          pushSync(events, state, recipient.side, 'confusion-applied');
           pushMessage(events, `${recipient.name} became confused!`);
         } else if (STATUS_IDS.has(move.ailment)) {
           recipient.status = applyMajorStatus(recipient, move.ailment, move);
-          pushSync(events, recipient.side, 'major-status-applied');
+          pushSync(events, state, recipient.side, 'major-status-applied');
           const verb = move.ailment === 'sleep' ? 'fell asleep' : `was ${move.ailment === 'badly-poisoned' ? 'badly poisoned' : move.ailment}`;
           pushMessage(events, `${recipient.name} ${verb}!`);
         }
@@ -702,18 +712,18 @@ const PokeBattleEngine = (() => {
       if (chance > 0 && Math.random() * 100 < chance) {
         const recipient = resolveStatChangeTarget(move, actor, target);
         move.statChanges.forEach(change => {
-          applyStageChange(events, recipient, change.stat, change.change);
+          applyStageChange(state, events, recipient, change.stat, change.change);
         });
       }
     }
   }
 
-  function handleFreezeOnHit(events, target, move) {
+  function handleFreezeOnHit(state, events, target, move) {
     if (!target.status || target.status.id !== 'freeze') return;
     const thawsTarget = move.type === 'fire' || THAWING_MOVES.has(move.id);
     if (!thawsTarget) return;
     target.status = null;
-    pushSync(events, target.side, 'thawed-by-hit');
+    pushSync(events, state, target.side, 'thawed-by-hit');
     pushMessage(events, `${target.name} thawed out!`);
   }
 
@@ -724,7 +734,7 @@ const PokeBattleEngine = (() => {
 
     if (!action.isStruggle) {
       actor.moves[action.index].currentPP -= 1;
-      pushSync(events, actor.side, 'pp-spent');
+      pushSync(events, state, actor.side, 'pp-spent');
     }
 
     pushMessage(events, `${actor.name} used ${move.name}!`);
@@ -746,9 +756,9 @@ const PokeBattleEngine = (() => {
         return;
       }
 
-      applyHP(events, target, target.currentHP - damageResult.amount, 'move-damage');
+      applyHP(state, events, target, target.currentHP - damageResult.amount, 'move-damage');
       pushAnimation(events, target.side, 'hit');
-      handleFreezeOnHit(events, target, move);
+      handleFreezeOnHit(state, events, target, move);
 
       if (damageResult.multiplier > 1) pushMessage(events, `It's super effective!`);
       else if (damageResult.multiplier > 0 && damageResult.multiplier < 1) pushMessage(events, `It's not very effective...`);
@@ -757,7 +767,7 @@ const PokeBattleEngine = (() => {
 
       if (action.isStruggle && !isFainted(actor)) {
         const recoil = Math.max(1, Math.floor(actor.maxHP / 4));
-        applyHP(events, actor, actor.currentHP - recoil, 'struggle-recoil');
+        applyHP(state, events, actor, actor.currentHP - recoil, 'struggle-recoil');
         pushAnimation(events, actor.side, 'self-hit');
         pushMessage(events, `${actor.name} was damaged by recoil!`);
       }
@@ -798,7 +808,7 @@ const PokeBattleEngine = (() => {
       const damage = getEndTurnDamage(battler);
       if (!damage) continue;
 
-      applyHP(events, battler, battler.currentHP - damage, 'end-turn-status');
+      applyHP(state, events, battler, battler.currentHP - damage, 'end-turn-status');
       const label = battler.status.id === 'burn'
         ? 'is hurt by its burn!'
         : battler.status.id === 'badly-poisoned'

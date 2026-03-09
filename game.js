@@ -114,6 +114,7 @@ function harvestPlot(tx, ty) {
 function updateFarmGrowth() {
   const now = Date.now();
   let changed = false;
+  let spawnOpportunity = false;
   Object.entries(farmPlots).forEach(([key, plot]) => {
     if (!plot.berryId || plot.stage === STAGE_READY || plot.stage === STAGE_EMPTY) return;
     const berry = BERRIES.find(b => b.id === plot.berryId);
@@ -123,9 +124,13 @@ function updateFarmGrowth() {
       plot.stage++;
       plot.stageStartAt = now;
       changed = true;
+      if (plot.stage > STAGE_SEED) spawnOpportunity = true;
     }
   });
-  if (changed) saveGame();
+  if (changed) {
+    saveGame();
+    if (spawnOpportunity) checkSpawnConditions();
+  }
 }
 
 // ----------------------------------------------
@@ -467,14 +472,14 @@ const SPAWN_CONDITIONS = [
     // CONDITION: harvest =5 Oran Berries since last encounter
     check: () => spawnTrackers.bulbasaur.oranHarvestCount >= 5,
     onReset: () => { spawnTrackers.bulbasaur.oranHarvestCount = 0; },
-    spawnChance: 0.55,   // 55% chance once threshold met
+    spawnChance: 1,
   },
   {
     species: 'charmander',
     // CONDITION: harvest =5 Rawst Berries since last encounter
     check: () => spawnTrackers.charmander.rawstHarvestCount >= 5,
     onReset: () => { spawnTrackers.charmander.rawstHarvestCount = 0; },
-    spawnChance: 0.55,
+    spawnChance: 1,
   },
   // Future Pokémon conditions go here
 ];
@@ -1088,6 +1093,11 @@ function getBattler(side) {
   return battle.state ? battle.state.battlers[side] : null;
 }
 
+function getFrameBattler(side, frame) {
+  if (frame && frame[side]) return frame[side];
+  return getBattler(side);
+}
+
 function renderStatusTag(el, label) {
   const classMap = {
     BRN: 'status-brn',
@@ -1109,8 +1119,8 @@ function renderStatusTag(el, label) {
   el.textContent = label;
 }
 
-function syncMoveButtons() {
-  const playerBattler = getBattler('player');
+function syncMoveButtons(frame = null) {
+  const playerBattler = getFrameBattler('player', frame);
   const noPpLeft = playerBattler ? playerBattler.moves.every(move => move.currentPP <= 0) : false;
 
   for (let i = 0; i < 4; i++) {
@@ -1141,9 +1151,9 @@ function syncMoveButtons() {
   }
 }
 
-function updateStatusDisplay() {
-  const playerBattler = getBattler('player');
-  const enemyBattler = getBattler('enemy');
+function updateStatusDisplay(frame = null) {
+  const playerBattler = getFrameBattler('player', frame);
+  const enemyBattler = getFrameBattler('enemy', frame);
   const playerStatuses = playerBattler ? battleEngine.getVisibleStatuses(playerBattler) : { major: '', volatile: '' };
   const enemyStatuses = enemyBattler ? battleEngine.getVisibleStatuses(enemyBattler) : { major: '', volatile: '' };
 
@@ -1153,11 +1163,11 @@ function updateStatusDisplay() {
   renderStatusTag(document.getElementById('enemy-volatile-status'), enemyStatuses.volatile);
 }
 
-function updateHPBars() {
-  if (!battle.state) return;
+function updateHPBars(frame = null) {
+  if (!battle.state && !frame) return;
 
-  const enemyBattler = getBattler('enemy');
-  const playerBattler = getBattler('player');
+  const enemyBattler = getFrameBattler('enemy', frame);
+  const playerBattler = getFrameBattler('player', frame);
 
   const enemyPct = Math.max(0, (enemyBattler.currentHP / enemyBattler.maxHP) * 100);
   const enemyBar = document.getElementById('enemy-hp-bar');
@@ -1170,21 +1180,21 @@ function updateHPBars() {
   playerBar.className = 'hp-bar ' + (playerPct > 50 ? 'hp-high' : playerPct > 25 ? 'hp-mid' : 'hp-low');
   document.getElementById('player-hp-text').textContent = playerBattler.currentHP + '/' + playerBattler.maxHP;
 
-  updateStatusDisplay();
+  updateStatusDisplay(frame);
 }
 
-function syncBattleFrame() {
-  if (!battle.state) return;
+function syncBattleFrame(frame = null) {
+  if (!battle.state && !frame) return;
 
-  const enemyBattler = getBattler('enemy');
-  const playerBattler = getBattler('player');
+  const enemyBattler = getFrameBattler('enemy', frame);
+  const playerBattler = getFrameBattler('player', frame);
   document.getElementById('enemy-name').textContent = enemyBattler.name;
   document.getElementById('enemy-level').textContent = 'Lv' + enemyBattler.level;
   document.getElementById('player-poke-name').textContent = playerBattler.name;
   document.getElementById('player-level').textContent = 'Lv' + playerBattler.level;
 
-  updateHPBars();
-  syncMoveButtons();
+  updateHPBars(frame);
+  syncMoveButtons(frame);
 }
 
 let _twTimer = null;
@@ -1246,7 +1256,7 @@ function playBattleAnimation(event) {
 async function playBattleEvents(events) {
   for (const event of events) {
     if (event.type === 'sync') {
-      syncBattleFrame();
+      syncBattleFrame(event.frame);
       continue;
     }
     if (event.type === 'animation') {
