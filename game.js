@@ -1,15 +1,15 @@
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  SPRITE SHEET CONFIG
 //  Sheet: player1sprites.png  — 3 cols × 4 rows, 128×128 px per frame
 //  Row 0=Down  Row 1=Up  Row 2=Left  Row 3=Right
 //  Col 0=Idle  Col 1=Walk1  Col 2=Walk2
 //
 //  Controls:
-//    Arrow Keys / WASD  → move
-//    Shift (hold)       → run
-//    Z / Space          → interact / plant / harvest  (A)
-//    X                  → back / cancel               (B)
-// ══════════════════════════════════════════════
+//    Arrow Keys / WASD  ? move
+//    Shift (hold)       ? run
+//    Z / Space          ? interact / plant / harvest  (A)
+//    X                  ? back / cancel               (B)
+// ----------------------------------------------
 const FRAME_W = 128;
 const FRAME_H = 128;
 const DIR_ROW = { down: 0, up: 1, left: 2, right: 3 };
@@ -39,10 +39,10 @@ farmTileImg.src = 'map assets/emptyplot.png';
 let farmPlotReady = false;
 farmTileImg.onload = () => { farmPlotReady = true; };
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  BERRY DATA
-// ══════════════════════════════════════════════
-// growTime = seconds per growth stage (4 stages: seed→seedling→grown→ready)
+// ----------------------------------------------
+// growTime = seconds per growth stage (4 stages: seed?seedling?grown?ready)
 // color    = accent color used in procedural art placeholder
 // yield    = how many berries harvested
 const BERRIES = [
@@ -62,7 +62,7 @@ const BERRIES = [
 const berryBag = {};
 BERRIES.forEach(b => { berryBag[b.id] = 3; }); // start with 3 of each for testing
 
-// ── Growth stages ──────────────────────────────
+// -- Growth stages ------------------------------
 // 0=empty  1=seed  2=seedling  3=grown  4=ready
 const STAGE_EMPTY = 0;
 const STAGE_SEED = 1;
@@ -128,9 +128,9 @@ function updateFarmGrowth() {
   if (changed) saveGame();
 }
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  PIXEL ART HELPERS
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 function drawPixelArt(ctx, pixels, x, y, scale = 1) {
   pixels.forEach(([px, py, color]) => {
     ctx.fillStyle = color;
@@ -138,7 +138,7 @@ function drawPixelArt(ctx, pixels, x, y, scale = 1) {
   });
 }
 
-// ── Procedural farm tile art ───────────────────
+// -- Procedural farm tile art -------------------
 // Draws a tilled soil square with optional crop stage overlay
 function drawFarmTile(sx, sy, tw, th, plot) {
   ctx.save();
@@ -293,7 +293,7 @@ function drawFarmTile(sx, sy, tw, th, plot) {
   ctx.restore();
 }
 
-// ── Battle sprite pixel art ────────────────────
+// -- Battle sprite pixel art --------------------
 const SPRITES = {
   wildPoke: (() => {
     const p = [];
@@ -339,152 +339,54 @@ const SPRITES = {
   })(),
 };
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  POKEMON DATA API (PokéAPI)
-// ══════════════════════════════════════════════
-const pokemonDataCache = {};
+// ----------------------------------------------
+const battleEngine = window.PokeBattleEngine;
 
 async function fetchPokemonData(species, level = 5) {
-  if (pokemonDataCache[species]) return pokemonDataCache[species];
   try {
-    const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${species.toLowerCase()}`);
-    const data = await res.json();
-
-    // Process all level-up moves
-    const allMoves = data.moves
-      .filter(m => m.version_group_details.some(v => v.move_learn_method.name === 'level-up'))
-      .map(m => {
-        const detail = m.version_group_details.find(v => v.move_learn_method.name === 'level-up');
-        return {
-          name: m.move.name.toUpperCase().replace('-', ' '),
-          url: m.move.url,
-          level: detail.level_learned_at
-        };
-      });
-
-    // Get current moves based on level (max 4, most recently learned)
-    const currentMovesMeta = allMoves
-      .filter(m => m.level <= level)
-      .sort((a, b) => b.level - a.level)
-      .slice(0, 4);
-
-    const movesPromises = currentMovesMeta.map(async m => {
-      try {
-        const mRes = await fetch(m.url);
-        const mData = await mRes.json();
-        return {
-          name: m.name,
-          power: mData.power,
-          pp: mData.pp,
-          type: mData.type.name,
-          category: mData.damage_class.name, // physical, special, status
-          accuracy: mData.accuracy,
-          effect_chance: mData.effect_chance,
-          effect_entries: mData.effect_entries
-        };
-      } catch (e) {
-        return { name: m.name, power: 40, pp: 35, type: 'normal', category: 'physical' };
-      }
-    });
-
-    const moves = await Promise.all(movesPromises);
-
-    // Stats: [hp, atk, def, spAtk, spDef, speed]
-    const baseStats = {};
-    data.stats.forEach(s => { baseStats[s.stat.name] = s.base_stat; });
-
-    const processedData = {
-      name: data.name.toUpperCase(),
-      types: data.types.map(t => t.type.name),
-      baseStats,
-      sprites: {
-        front: data.sprites.versions['generation-v']['black-white'].animated.front_default || data.sprites.front_default,
-        back: data.sprites.versions['generation-v']['black-white'].animated.back_default || data.sprites.back_default,
-      },
-      moves: moves.length > 0 ? moves : [{ name: 'TACKLE', power: 40, pp: 35, type: 'normal', category: 'physical' }]
-    };
-    pokemonDataCache[species] = processedData;
-    return processedData;
+    return await battleEngine.getPokemonBattleData(species, level);
   } catch (err) {
     console.warn(`PokéAPI fetch failed for ${species}:`, err);
     return null;
   }
 }
 
-// Enhanced Type Chart
-const TYPE_CHART = {
-  fire: { grass: 2, water: 0.5, fire: 0.5, bug: 2, ice: 2, steel: 2, rock: 0.5, dragon: 0.5 },
-  water: { fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5 },
-  grass: { water: 2, grass: 0.5, fire: 0.5, ground: 2, rock: 2, flying: 0.5, poison: 0.5, bug: 0.5, steel: 0.5, dragon: 0.5 },
-  electric: { water: 2, electric: 0.5, grass: 0.5, ground: 0, flying: 2, dragon: 0.5 },
-  normal: { rock: 0.5, ghost: 0, steel: 0.5 },
-  flying: { grass: 2, fighting: 2, bug: 2, electric: 0.5, rock: 0.5, steel: 0.5 },
-  poison: { grass: 2, fairy: 2, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0 },
-  ground: { fire: 2, electric: 2, poison: 2, rock: 2, steel: 2, grass: 0.5, bug: 0.5, flying: 0 },
-  rock: { fire: 2, ice: 2, flying: 2, bug: 2, fighting: 0.5, ground: 0.5, steel: 0.5 },
-  bug: { grass: 2, psychic: 2, dark: 2, fire: 0.5, fighting: 0.5, poison: 0.5, flying: 0.5, ghost: 0.5, steel: 0.5, fairy: 0.5 },
-  ghost: { ghost: 2, psychic: 2, normal: 0, dark: 0.5 },
-  steel: { ice: 2, rock: 2, fairy: 2, fire: 0.5, water: 0.5, electric: 0.5, steel: 0.5 },
-  ice: { grass: 2, ground: 2, flying: 2, dragon: 2, fire: 0.5, water: 0.5, ice: 0.5, steel: 0.5 },
-};
+const calculateStat = battleEngine.calculateStat;
 
-function getEffectiveness(moveType, targetTypes) {
-  let mult = 1;
-  targetTypes.forEach(t => {
-    if (TYPE_CHART[moveType] && TYPE_CHART[moveType][t] !== undefined) {
-      mult *= TYPE_CHART[moveType][t];
-    }
-  });
-  return mult;
-}
+function drawSpriteToCanvas(canvasId, spriteUrl, scale) {
+  const canvasEl = document.getElementById(canvasId);
+  const canvasCtx = canvasEl.getContext('2d');
+  canvasCtx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+  if (!spriteUrl) return;
 
-function calculateStat(base, level, iv = 15, ev = 0, isHP = false) {
-  if (isHP) {
-    return Math.floor(((base * 2 + iv + Math.floor(ev / 4)) * level) / 100) + level + 10;
-  }
-  return Math.floor(((base * 2 + iv + Math.floor(ev / 4)) * level) / 100) + 5;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = spriteUrl;
+  img.onload = () => {
+    canvasCtx.imageSmoothingEnabled = false;
+    const sw = img.width * scale;
+    const sh = img.height * scale;
+    canvasCtx.drawImage(img, (canvasEl.width - sw) / 2, (canvasEl.height - sh) / 2, sw, sh);
+  };
 }
 
 async function drawBattleSprites() {
-  const ec = document.getElementById('enemy-sprite');
-  const ectx = ec.getContext('2d');
-  ectx.clearRect(0, 0, ec.width, ec.height);
+  const enemyData = battle.state
+    ? battle.state.battlers.enemy
+    : await fetchPokemonData(wildPokemon.species || 'bulbasaur', 5);
+  const playerData = battle.state
+    ? battle.state.battlers.player
+    : await fetchPokemonData('charmander', 5);
 
-  const enemyData = await fetchPokemonData(wildPokemon.species || 'bulbasaur');
-  if (enemyData && enemyData.sprites.front) {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = enemyData.sprites.front;
-    img.onload = () => {
-      ectx.imageSmoothingEnabled = false;
-      // Draw centered and larger
-      const scale = 2;
-      const sw = img.width * scale, sh = img.height * scale;
-      ectx.drawImage(img, (ec.width - sw) / 2, (ec.height - sh) / 2, sw, sh);
-    };
-  }
-
-  const pc = document.getElementById('player-back-sprite');
-  const pctx = pc.getContext('2d');
-  pctx.clearRect(0, 0, pc.width, pc.height);
-
-  const playerData = await fetchPokemonData('charmander');
-  if (playerData && playerData.sprites.back) {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = playerData.sprites.back;
-    img.onload = () => {
-      pctx.imageSmoothingEnabled = false;
-      const scale = 2.5; // Back sprite usually looks better even larger
-      const sw = img.width * scale, sh = img.height * scale;
-      pctx.drawImage(img, (pc.width - sw) / 2, (pc.height - sh) / 2, sw, sh);
-    };
-  }
+  drawSpriteToCanvas('enemy-sprite', enemyData && enemyData.sprites ? enemyData.sprites.front : null, 2);
+  drawSpriteToCanvas('player-back-sprite', playerData && playerData.sprites ? playerData.sprites.back : null, 2.5);
 }
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  OVERWORLD ENGINE
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 const canvas = document.getElementById('overworld');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
@@ -528,14 +430,14 @@ for (let ty = 0; ty < MAP_H; ty++) {
 
 const TILE_COLORS = { 0: '#5a9e3b', 1: '#4a8530', 2: '#c8a96e', 3: '#2d6e20', 4: '#5c3a1e' };
 
-// ── Player ─────────────────────────────────────
+// -- Player -------------------------------------
 const player = {
   tx: 10, ty: 9, px: 10 * TILE, py: 9 * TILE,
   targetTX: 10, targetTY: 9, targetPX: 10 * TILE, targetPY: 9 * TILE,
   moving: false, running: false, dir: 'down',
 };
 
-// ── Wild Pokémon Spawn System ─────────────────
+// -- Wild Pokémon Spawn System -----------------
 // Dynamic state — replaced the static always-visible placeholder
 const wildPokemon = {
   active: false,          // Is a Pokémon currently on the map?
@@ -552,7 +454,7 @@ const wildPokemon = {
   dir: 'down',       // Current facing direction for sprite row selection
 };
 
-// ── Spawn Condition Registry ──────────────────
+// -- Spawn Condition Registry ------------------
 // Add new entries here when new Pokémon conditions are designed.
 const spawnTrackers = {
   bulbasaur: { oranHarvestCount: 0 },
@@ -562,14 +464,14 @@ const spawnTrackers = {
 const SPAWN_CONDITIONS = [
   {
     species: 'bulbasaur',
-    // CONDITION: harvest ≥5 Oran Berries since last encounter
+    // CONDITION: harvest =5 Oran Berries since last encounter
     check: () => spawnTrackers.bulbasaur.oranHarvestCount >= 5,
     onReset: () => { spawnTrackers.bulbasaur.oranHarvestCount = 0; },
     spawnChance: 0.55,   // 55% chance once threshold met
   },
   {
     species: 'charmander',
-    // CONDITION: harvest ≥5 Rawst Berries since last encounter
+    // CONDITION: harvest =5 Rawst Berries since last encounter
     check: () => spawnTrackers.charmander.rawstHarvestCount >= 5,
     onReset: () => { spawnTrackers.charmander.rawstHarvestCount = 0; },
     spawnChance: 0.55,
@@ -752,7 +654,7 @@ function drawWildPokemon(camX, camY) {
   ctx.restore();
 }
 
-// ── Canvas / scale ─────────────────────────────
+// -- Canvas / scale -----------------------------
 const SCREEN_W = 960;
 const SCREEN_H = 720;
 let scaleX = SCREEN_W / LOGIC_W;
@@ -783,9 +685,9 @@ function tileBlocked(tx, ty) {
   return MAP[ty][tx] === 3;
 }
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  TILE DRAWING
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 function drawTile(tx, ty, camX, camY) {
   const type = MAP[ty]?.[tx] ?? 0;
   const sx = Math.floor((tx * TILE - camX) * scaleX);
@@ -819,7 +721,7 @@ function drawTile(tx, ty, camX, camY) {
   }
 }
 
-// ── Player sprite ──────────────────────────────
+// -- Player sprite ------------------------------
 function drawPlayerSprite(psx, psy) {
   if (sheetReady) {
     const row = DIR_ROW[player.dir] ?? 0;
@@ -841,7 +743,7 @@ function drawPlayerSprite(psx, psy) {
   }
 }
 
-// ── Dust particles ─────────────────────────────
+// -- Dust particles -----------------------------
 const dustParticles = [];
 function spawnDust(x, y) {
   if (dustParticles.length > 100) return; // Cap particles to prevent memory issues
@@ -866,9 +768,9 @@ function updateDrawDust(psx, psy) {
   ctx.globalAlpha = 1;
 }
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  OVERWORLD DRAW
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 function drawOverworld() {
   // Reset key canvas states to prevent "sticky" glitches
   ctx.globalAlpha = 1;
@@ -961,9 +863,9 @@ function drawHint(psx, psy, text) {
   ctx.fillText(text, hx + Math.round(4 * scaleX), hy + Math.round(10 * scaleY));
 }
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  FARM HUD
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 function updateFarmHUD() {
   const list = document.getElementById('farm-hud-list');
   list.innerHTML = '';
@@ -978,9 +880,9 @@ function updateFarmHUD() {
 }
 updateFarmHUD();
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  BERRY MENU UI
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 let pendingFarmTX = null, pendingFarmTY = null;
 let selectedBerryIndex = -1;
 let berryButtons = [];
@@ -1040,7 +942,7 @@ function closeBerryMenu() {
 
 document.getElementById('berry-cancel-btn').addEventListener('click', closeBerryMenu);
 
-// ── Overworld Dialogue ─────────────────────────
+// -- Overworld Dialogue -------------------------
 let _owMsgTimer = null;
 function showOverworldMsg(text, cb) {
   if (_owMsgTimer) clearInterval(_owMsgTimer);
@@ -1065,9 +967,9 @@ function closeOverworldMsg() {
   gameState = 'overworld';
 }
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  INPUT
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 const keys = {};
 document.addEventListener('keydown', e => {
   keys[e.key] = true;
@@ -1130,9 +1032,9 @@ function handleBPress() {
   if (document.getElementById('moves-menu').style.display === 'flex') showActions();
 }
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  MOVEMENT
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 let gameState = 'overworld';
 
 function processMovement() {
@@ -1172,76 +1074,225 @@ function processMovement() {
   }
 }
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  BATTLE SYSTEM
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 const battle = {
-  playerHP: 20, playerMaxHP: 20, enemyHP: 18, enemyMaxHP: 18,
-  playerStats: {}, enemyStats: {},
-  playerLevel: 5, enemyLevel: 5,
-  turn: 'player', busy: false,
-  playerData: null, enemyData: null,
-  playerMoves: [], enemyMoves: [],
-  playerStatus: null, enemyStatus: null, // 'burn', 'para', 'poison', 'sleep', 'freeze'
+  busy: false,
+  state: null,
+  playerLevel: 5,
+  enemyLevel: 5,
 };
+
+function getBattler(side) {
+  return battle.state ? battle.state.battlers[side] : null;
+}
+
+function renderStatusTag(el, label) {
+  const classMap = {
+    BRN: 'status-brn',
+    PAR: 'status-par',
+    SLP: 'status-slp',
+    FRZ: 'status-frz',
+    PSN: 'status-psn',
+    TOX: 'status-tox',
+    CONF: 'status-conf',
+  };
+
+  el.className = 'status-tag';
+  if (!label) {
+    el.textContent = '';
+    return;
+  }
+
+  el.classList.add(classMap[label] || '');
+  el.textContent = label;
+}
+
+function syncMoveButtons() {
+  const playerBattler = getBattler('player');
+  const noPpLeft = playerBattler ? playerBattler.moves.every(move => move.currentPP <= 0) : false;
+
+  for (let i = 0; i < 4; i++) {
+    const btn = document.getElementById(`move${i + 1}-btn`);
+    if (!playerBattler) {
+      btn.style.display = 'none';
+      continue;
+    }
+
+    if (noPpLeft) {
+      btn.style.display = i === 0 ? 'block' : 'none';
+      if (i === 0) {
+        btn.textContent = 'STRUGGLE\nNORMAL  1/1 PP';
+        btn.disabled = battle.busy;
+      }
+      continue;
+    }
+
+    const move = playerBattler.moves[i];
+    if (!move) {
+      btn.style.display = 'none';
+      continue;
+    }
+
+    btn.style.display = 'block';
+    btn.textContent = `${move.name}\n${battleEngine.getMoveSummary(move)}`;
+    btn.disabled = battle.busy || move.currentPP <= 0;
+  }
+}
+
+function updateStatusDisplay() {
+  const playerBattler = getBattler('player');
+  const enemyBattler = getBattler('enemy');
+  const playerStatuses = playerBattler ? battleEngine.getVisibleStatuses(playerBattler) : { major: '', volatile: '' };
+  const enemyStatuses = enemyBattler ? battleEngine.getVisibleStatuses(enemyBattler) : { major: '', volatile: '' };
+
+  renderStatusTag(document.getElementById('player-status'), playerStatuses.major);
+  renderStatusTag(document.getElementById('player-volatile-status'), playerStatuses.volatile);
+  renderStatusTag(document.getElementById('enemy-status'), enemyStatuses.major);
+  renderStatusTag(document.getElementById('enemy-volatile-status'), enemyStatuses.volatile);
+}
+
+function updateHPBars() {
+  if (!battle.state) return;
+
+  const enemyBattler = getBattler('enemy');
+  const playerBattler = getBattler('player');
+
+  const enemyPct = Math.max(0, (enemyBattler.currentHP / enemyBattler.maxHP) * 100);
+  const enemyBar = document.getElementById('enemy-hp-bar');
+  enemyBar.style.width = enemyPct + '%';
+  enemyBar.className = 'hp-bar ' + (enemyPct > 50 ? 'hp-high' : enemyPct > 25 ? 'hp-mid' : 'hp-low');
+
+  const playerPct = Math.max(0, (playerBattler.currentHP / playerBattler.maxHP) * 100);
+  const playerBar = document.getElementById('player-hp-bar');
+  playerBar.style.width = playerPct + '%';
+  playerBar.className = 'hp-bar ' + (playerPct > 50 ? 'hp-high' : playerPct > 25 ? 'hp-mid' : 'hp-low');
+  document.getElementById('player-hp-text').textContent = playerBattler.currentHP + '/' + playerBattler.maxHP;
+
+  updateStatusDisplay();
+}
+
+function syncBattleFrame() {
+  if (!battle.state) return;
+
+  const enemyBattler = getBattler('enemy');
+  const playerBattler = getBattler('player');
+  document.getElementById('enemy-name').textContent = enemyBattler.name;
+  document.getElementById('enemy-level').textContent = 'Lv' + enemyBattler.level;
+  document.getElementById('player-poke-name').textContent = playerBattler.name;
+  document.getElementById('player-level').textContent = 'Lv' + playerBattler.level;
+
+  updateHPBars();
+  syncMoveButtons();
+}
+
+let _twTimer = null;
+function showBattleMsg(msg, cb) {
+  if (_twTimer) clearInterval(_twTimer);
+  const el = document.getElementById('battle-msg');
+  hideBattleUI();
+  el.textContent = '';
+  let i = 0;
+  _twTimer = setInterval(() => {
+    el.textContent += msg[i++];
+    if (i >= msg.length) {
+      clearInterval(_twTimer);
+      _twTimer = null;
+      if (cb) setTimeout(cb, 600);
+    }
+  }, 35);
+}
+
+function showBattleMsgAsync(msg) {
+  return new Promise(resolve => showBattleMsg(msg, resolve));
+}
+
+function hideBattleUI() {
+  document.getElementById('battle-actions').style.display = 'none';
+  document.getElementById('moves-menu').style.display = 'none';
+}
+
+function showActions() {
+  const playerBattler = getBattler('player');
+  document.getElementById('battle-msg').textContent = `What will ${playerBattler ? playerBattler.name : 'POKEMON'} do?`;
+  document.getElementById('battle-actions').style.display = 'flex';
+  document.getElementById('moves-menu').style.display = 'none';
+  setActionBtnsDisabled(false);
+  syncMoveButtons();
+}
+
+function showMoves() {
+  document.getElementById('battle-actions').style.display = 'none';
+  document.getElementById('moves-menu').style.display = 'flex';
+  document.getElementById('battle-msg').textContent = 'Choose a move:';
+  syncMoveButtons();
+}
+
+function setActionBtnsDisabled(disabled) {
+  document.querySelectorAll('.battle-btn').forEach(btn => btn.disabled = disabled);
+  document.querySelectorAll('.move-btn').forEach(btn => btn.disabled = disabled);
+}
+
+function playBattleAnimation(event) {
+  const targetId = event.side === 'player' ? 'player-back-sprite' : 'enemy-sprite';
+  const el = document.getElementById(targetId);
+  const effectClass = event.side === 'player' ? 'shake' : 'hit-flash';
+  const duration = effectClass === 'shake' ? 350 : 450;
+  el.classList.add(effectClass);
+  setTimeout(() => el.classList.remove(effectClass), duration);
+}
+
+async function playBattleEvents(events) {
+  for (const event of events) {
+    if (event.type === 'sync') {
+      syncBattleFrame();
+      continue;
+    }
+    if (event.type === 'animation') {
+      playBattleAnimation(event);
+      continue;
+    }
+    if (event.type === 'message') {
+      await showBattleMsgAsync(event.text);
+    }
+  }
+  syncBattleFrame();
+}
+
+function resetBattleScene() {
+  document.getElementById('battle-screen').style.display = 'none';
+  document.getElementById('overworld').style.display = 'block';
+  document.getElementById('farm-hud').style.display = 'block';
+  gameState = 'overworld';
+  battle.state = null;
+  battle.busy = false;
+  wildPokemon.active = false;
+  wildPokemon.state = 'idle';
+  wildPokemon.targetCropKey = null;
+}
 
 async function startBattle() {
   gameState = 'battle';
-  battle.turn = 'player'; battle.busy = true;
+  battle.busy = true;
   const trans = document.getElementById('battle-transition');
   trans.style.display = 'block';
 
-  // Random level for wild pokémon 2-7
   battle.enemyLevel = 2 + Math.floor(Math.random() * 6);
   battle.playerLevel = 5;
 
-  const [pData, eData] = await Promise.all([
+  const [playerData, enemyData] = await Promise.all([
     fetchPokemonData('charmander', battle.playerLevel),
     fetchPokemonData(wildPokemon.species || 'bulbasaur', battle.enemyLevel)
   ]);
 
-  battle.playerData = pData;
-  battle.enemyData = eData;
-
-  // Calculate Stats
-  const pBase = pData.baseStats;
-  const eBase = eData.baseStats;
-
-  battle.playerMaxHP = calculateStat(pBase.hp, battle.playerLevel, 31, 100, true);
-  battle.playerHP = battle.playerMaxHP;
-  battle.playerStats = {
-    atk: calculateStat(pBase.attack, battle.playerLevel),
-    def: calculateStat(pBase.defense, battle.playerLevel),
-    spAtk: calculateStat(pBase['special-attack'], battle.playerLevel),
-    spDef: calculateStat(pBase['special-defense'], battle.playerLevel),
-    speed: calculateStat(pBase.speed, battle.playerLevel),
-  };
-
-  battle.enemyMaxHP = calculateStat(eBase.hp, battle.enemyLevel, 15, 0, true);
-  battle.enemyHP = battle.enemyMaxHP;
-  battle.enemyStats = {
-    atk: calculateStat(eBase.attack, battle.enemyLevel),
-    def: calculateStat(eBase.defense, battle.enemyLevel),
-    spAtk: calculateStat(eBase['special-attack'], battle.enemyLevel),
-    spDef: calculateStat(eBase['special-defense'], battle.enemyLevel),
-    speed: calculateStat(eBase.speed, battle.enemyLevel),
-  };
-
-  battle.playerMoves = pData.moves;
-  battle.enemyMoves = eData.moves;
-
-  // UI Setup
-  battle.playerMoves.forEach((m, i) => {
-    const btn = document.getElementById(`move${i + 1}-btn`);
-    if (btn) {
-      btn.textContent = m.name;
-      btn.style.display = 'block';
-    }
-  });
-  for (let i = battle.playerMoves.length; i < 4; i++) {
-    const btn = document.getElementById(`move${i + 1}-btn`);
-    if (btn) btn.style.display = 'none';
+  if (!playerData || !enemyData) {
+    trans.style.display = 'none';
+    resetBattleScene();
+    return;
   }
+
+  battle.state = battleEngine.createBattleState(playerData, enemyData);
 
   setTimeout(() => {
     trans.style.display = 'none';
@@ -1249,19 +1300,14 @@ async function startBattle() {
     document.getElementById('battle-screen').style.display = 'flex';
     document.getElementById('farm-hud').style.display = 'none';
 
-    document.getElementById('enemy-name').textContent = battle.enemyData.name;
-    document.getElementById('enemy-level').textContent = 'Lv' + battle.enemyLevel;
-    document.getElementById('player-poke-name').textContent = battle.playerData.name;
-    document.getElementById('player-level').textContent = 'Lv' + battle.playerLevel;
-
+    syncBattleFrame();
     drawBattleSprites();
-    updateHPBars();
     battle.busy = false;
 
-    showBattleMsg(`A wild ${battle.enemyData.name} appeared!`, () => {
-      showBattleMsg(`Go! ${battle.playerData.name}!`, () =>
-        showBattleMsg(`What will ${battle.playerData.name} do?`, showActions)
-      );
+    showBattleMsg(`A wild ${enemyData.name} appeared!`, () => {
+      showBattleMsg(`Go! ${playerData.name}!`, () => {
+        showBattleMsg(`What will ${playerData.name} do?`, showActions);
+      });
     });
   }, 700);
 }
@@ -1269,270 +1315,75 @@ async function startBattle() {
 function endBattle(won) {
   hideBattleUI();
 
-  // Reset spawn conditions for whichever species was encountered
   const cond = SPAWN_CONDITIONS.find(c => c.species === wildPokemon.species);
   if (cond) cond.onReset();
 
-  showBattleMsg(won ? 'You defeated the wild Pokémon!\nGained 24 EXP!' : 'CHARMANDER fainted!', () => {
+  const playerBattler = getBattler('player');
+  const playerName = playerBattler ? playerBattler.name : 'CHARMANDER';
+  const endMessage = won ? 'You defeated the wild Pokemon!\nGained 24 EXP!' : `${playerName} fainted!`;
+
+  showBattleMsg(endMessage, () => {
     setTimeout(() => {
-      document.getElementById('battle-screen').style.display = 'none';
-      document.getElementById('overworld').style.display = 'block';
-      document.getElementById('farm-hud').style.display = 'block';
-      gameState = 'overworld';
-      wildPokemon.active = false;
-      wildPokemon.state = 'idle';
       if (!won) {
-        player.tx = 10; player.ty = 9;
-        player.px = player.tx * TILE; player.py = player.ty * TILE;
-        battle.playerHP = battle.playerMaxHP;
+        player.tx = 10;
+        player.ty = 9;
+        player.px = player.tx * TILE;
+        player.py = player.ty * TILE;
       }
+      resetBattleScene();
     }, 1200);
   });
 }
 
-function updateHPBars() {
-  const ePct = Math.max(0, (battle.enemyHP / battle.enemyMaxHP) * 100);
-  const eBar = document.getElementById('enemy-hp-bar');
-  eBar.style.width = ePct + '%';
-  eBar.className = 'hp-bar ' + (ePct > 50 ? 'hp-high' : ePct > 25 ? 'hp-mid' : 'hp-low');
+async function useMove(idx) {
+  if (battle.busy || !battle.state) return;
+  battle.busy = true;
+  hideBattleUI();
+  setActionBtnsDisabled(true);
 
-  const pPct = Math.max(0, (battle.playerHP / battle.playerMaxHP) * 100);
-  const pBar = document.getElementById('player-hp-bar');
-  pBar.style.width = pPct + '%';
-  pBar.className = 'hp-bar ' + (pPct > 50 ? 'hp-high' : pPct > 25 ? 'hp-mid' : 'hp-low');
-  document.getElementById('player-hp-text').textContent = battle.playerHP + '/' + battle.playerMaxHP;
+  const result = await battleEngine.executeRound(battle.state, idx);
+  await playBattleEvents(result.events);
 
-  updateStatusDisplay();
-}
+  if (result.winner === 'player') {
+    endBattle(true);
+    return;
+  }
 
-function updateStatusDisplay() {
-  const ps = document.getElementById('player-status');
-  const es = document.getElementById('enemy-status');
+  if (result.winner === 'enemy') {
+    endBattle(false);
+    return;
+  }
 
-  [{ s: battle.playerStatus, el: ps }, { s: battle.enemyStatus, el: es }].forEach(tag => {
-    tag.el.className = 'status-tag';
-    if (tag.s) {
-      tag.el.classList.add('status-' + tag.s.substring(0, 3));
-      tag.el.textContent = tag.s.substring(0, 3).toUpperCase();
-    } else {
-      tag.el.textContent = '';
-    }
-  });
+  battle.busy = false;
+  showActions();
 }
 
-let _twTimer = null;
-function showBattleMsg(msg, cb) {
-  if (_twTimer) clearInterval(_twTimer);
-  const el = document.getElementById('battle-msg');
-  hideBattleUI(); el.textContent = ''; let i = 0;
-  _twTimer = setInterval(() => {
-    el.textContent += msg[i++];
-    if (i >= msg.length) { clearInterval(_twTimer); _twTimer = null; if (cb) setTimeout(cb, 600); }
-  }, 35);
-}
-function hideBattleUI() {
-  document.getElementById('battle-actions').style.display = 'none';
-  document.getElementById('moves-menu').style.display = 'none';
-}
-function showActions() {
-  document.getElementById('battle-msg').textContent = 'What will CHARMANDER do?';
-  document.getElementById('battle-actions').style.display = 'flex';
-  document.getElementById('moves-menu').style.display = 'none';
-  setActionBtnsDisabled(false);
-}
-function showMoves() {
-  document.getElementById('battle-actions').style.display = 'none';
-  document.getElementById('moves-menu').style.display = 'flex';
-  document.getElementById('battle-msg').textContent = 'Choose a move:';
-}
-function setActionBtnsDisabled(d) {
-  document.querySelectorAll('.battle-btn').forEach(b => b.disabled = d);
-  document.querySelectorAll('.move-btn').forEach(b => b.disabled = d);
-}
-
-document.getElementById('fight-btn').addEventListener('click', () => { if (!battle.busy) showMoves(); });
-document.getElementById('back-btn').addEventListener('click', showActions);
-['move1-btn', 'move2-btn', 'move3-btn', 'move4-btn'].forEach((id, i) => {
-  document.getElementById(id).addEventListener('click', () => { if (!battle.busy) useMove(i); });
+document.getElementById('fight-btn').addEventListener('click', () => {
+  if (!battle.busy) showMoves();
 });
+
+document.getElementById('back-btn').addEventListener('click', showActions);
+
+['move1-btn', 'move2-btn', 'move3-btn', 'move4-btn'].forEach((id, i) => {
+  document.getElementById(id).addEventListener('click', () => {
+    if (!battle.busy) useMove(i);
+  });
+});
+
 document.getElementById('run-btn').addEventListener('click', () => {
   if (battle.busy) return;
-  hideBattleUI(); battle.busy = true;
+  hideBattleUI();
+  battle.busy = true;
   showBattleMsg('Got away safely!', () => {
     setTimeout(() => {
-      document.getElementById('battle-screen').style.display = 'none';
-      document.getElementById('overworld').style.display = 'block';
-      document.getElementById('farm-hud').style.display = 'block';
-      gameState = 'overworld'; battle.busy = false;
+      resetBattleScene();
     }, 800);
   });
 });
 
-function calculateDamage(move, attacker, defender, aLevel, dData, aStatus) {
-  if (!move.power) return { amount: 0, effectiveness: 1 };
-
-  // Choose Physical or Special attack/defense
-  let aStat = move.category === 'special' ? attacker.spAtk : attacker.atk;
-  const dStat = move.category === 'special' ? defender.spDef : defender.def;
-
-  // Burn Penalty: lowers Attack by 50%
-  if (aStatus === 'burn' && move.category === 'physical') {
-    aStat = Math.floor(aStat * 0.5);
-  }
-
-  // Base Damage
-  let dmg = ((((2 * aLevel / 5) + 2) * move.power * (aStat / dStat)) / 50) + 2;
-
-  // Multipliers
-  const effectiveness = getEffectiveness(move.type, dData.types);
-  dmg *= effectiveness;
-
-  // Random variance [0.85, 1.0]
-  dmg *= (Math.random() * (1 - 0.85) + 0.85);
-
-  return { amount: Math.max(1, Math.floor(dmg)), effectiveness };
-}
-
-function checkMoveSuccess(move, status) {
-  // Check accuracy
-  if (move.accuracy && Math.random() * 100 > move.accuracy) return { hit: false, msg: "The attack missed!" };
-
-  // Status check
-  if (status === 'sleep') return { hit: false, msg: "is fast asleep!" };
-  if (status === 'freeze') return { hit: false, msg: "is frozen solid!" };
-  if (status === 'paralyzed' && Math.random() < 0.25) return { hit: false, msg: "is paralyzed! It can't move!" };
-
-  return { hit: true };
-}
-
-function handleStatusChance(move, targetStatus) {
-  if (!move.effect_chance) return null;
-  if (targetStatus) return null; // Already has a status
-
-  if (Math.random() * 100 < move.effect_chance) {
-    // Simplified effect parsing
-    if (move.name.includes('EMBER')) return 'burn';
-    if (move.name.includes('THUNDER') || move.name.includes('BOLT')) return 'paralyzed';
-    if (move.name.includes('ICE') || move.name.includes('POWDER')) return 'freeze';
-    if (move.name.includes('SLUDGE') || move.name.includes('POISON')) return 'poison';
-    if (move.name.includes('HYPNOSIS') || move.name.includes('SLEEP')) return 'sleep';
-  }
-  return null;
-}
-
-function useMove(idx) {
-  if (battle.busy) return;
-  battle.busy = true; hideBattleUI(); setActionBtnsDisabled(true);
-  const move = battle.playerMoves[idx];
-  const pName = battle.playerData.name;
-  const eName = battle.enemyData.name;
-
-  const success = checkMoveSuccess(move, battle.playerStatus);
-  if (!success.hit) {
-    showBattleMsg(`${pName} ${success.msg}`, () => setTimeout(enemyTurn, 800));
-    return;
-  }
-
-  const result = calculateDamage(move, battle.playerStats, battle.enemyStats, battle.playerLevel, battle.enemyData, battle.playerStatus);
-  battle.enemyHP = Math.max(0, battle.enemyHP - result.amount);
-
-  // Check for status effect application
-  const newStatus = handleStatusChance(move, battle.enemyStatus);
-  if (newStatus) battle.enemyStatus = newStatus;
-
-  updateHPBars();
-  const es = document.getElementById('enemy-sprite');
-  if (result.amount > 0) { es.classList.add('hit-flash'); setTimeout(() => es.classList.remove('hit-flash'), 450); }
-
-  let msg = `${pName} used ${move.name}!`;
-  if (result.effectiveness > 1) msg += "\nIt's super effective!";
-  if (result.effectiveness < 1 && result.effectiveness > 0) msg += "\nIt's not very effective...";
-  if (result.effectiveness === 0) msg += "\nIt had no effect...";
-  if (newStatus) msg += `\n${eName} was ${newStatus}!`;
-
-  showBattleMsg(msg, () => {
-    if (battle.enemyHP <= 0) {
-      showBattleMsg(`${eName} fainted!`, () => endBattle(true));
-      return;
-    }
-    setTimeout(enemyTurn, 600);
-  });
-}
-
-function enemyTurn() {
-  const eName = battle.enemyData.name;
-  const pName = battle.playerData.name;
-
-  const success = checkMoveSuccess({ accuracy: 100 }, battle.enemyStatus);
-  if (!success.hit) {
-    showBattleMsg(`${eName} ${success.msg}`, () => endTurnProcess());
-    return;
-  }
-
-  const move = battle.enemyMoves[Math.floor(Math.random() * battle.enemyMoves.length)] || { name: 'TACKLE', power: 40, category: 'physical', type: 'normal', accuracy: 100 };
-  const result = calculateDamage(move, battle.enemyStats, battle.playerStats, battle.enemyLevel, battle.playerData, battle.enemyStatus);
-
-  battle.playerHP = Math.max(0, battle.playerHP - result.amount);
-
-  const newStatus = handleStatusChance(move, battle.playerStatus);
-  if (newStatus) battle.playerStatus = newStatus;
-
-  updateHPBars();
-  const ps = document.getElementById('player-back-sprite');
-  ps.classList.add('shake'); setTimeout(() => ps.classList.remove('shake'), 350);
-
-  let msg = `${eName} used ${move.name}!`;
-  if (result.effectiveness > 1) msg += "\nIt's super effective!";
-  if (result.effectiveness < 1 && result.effectiveness > 0) msg += "\nIt's not very effective...";
-  if (result.effectiveness === 0) msg += "\nIt had no effect...";
-  if (newStatus) msg += `\n${pName} was ${newStatus}!`;
-
-  showBattleMsg(msg, () => {
-    if (battle.playerHP <= 0) { showBattleMsg(`${pName} fainted!`, () => endBattle(false)); return; }
-    endTurnProcess();
-  });
-}
-
-function endTurnProcess() {
-  // Turn wrap up: status damage
-  const checkStatusDamage = (status, hp, maxHP, name) => {
-    if (status === 'poison' || status === 'burn') {
-      const dmg = Math.floor(maxHP / 8);
-      return { dmg, msg: `${name} is hurt by its ${status}!` };
-    }
-    return null;
-  };
-
-  const pSt = checkStatusDamage(battle.playerStatus, battle.playerHP, battle.playerMaxHP, battle.playerData.name);
-  const eSt = checkStatusDamage(battle.enemyStatus, battle.enemyHP, battle.enemyMaxHP, battle.enemyData.name);
-
-  const applyRes = (res, target, hpKey, next) => {
-    if (res) {
-      battle[hpKey] = Math.max(0, battle[hpKey] - res.dmg);
-      updateHPBars();
-      showBattleMsg(res.msg, () => {
-        if (battle[hpKey] <= 0) {
-          showBattleMsg(`${res.msg.split(' ')[0]} fainted!`, () => endBattle(target === 'player' ? false : true));
-        } else {
-          next();
-        }
-      });
-    } else {
-      next();
-    }
-  };
-
-  applyRes(pSt, 'player', 'playerHP', () => {
-    applyRes(eSt, 'enemy', 'enemyHP', () => {
-      battle.busy = false;
-      showActions();
-    });
-  });
-}
-
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  MAIN LOOP
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 drawBattleSprites();
 
 // Farm growth updates every second
@@ -1549,9 +1400,9 @@ function gameLoop() {
 
 gameLoop();
 
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 //  SAVE SYSTEM
-// ══════════════════════════════════════════════
+// ----------------------------------------------
 function saveGame() {
   const saveData = {
     berryBag: berryBag,
